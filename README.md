@@ -6,7 +6,7 @@ This repo contains the early development code for the C030 board.  This code wil
 
 To fetch and build the code in this repository you need first to install the [mbed CLI tools](https://github.com/ARMmbed/mbed-cli#installation) and their prerequisites; this will include a compiler (you can use GCC_ARM, ARM or IAR).  You will need to use `mbed config` to tell the mbed CLI tools where that compiler is.
 
-You will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC.
+You will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC; we're using this at the moment for driver development as it includes the LiPo battery gauge, LiPo battery charger and primary cell battery gauge chips that we will use on the C030 baord.
 
 # How To Use This Code
 

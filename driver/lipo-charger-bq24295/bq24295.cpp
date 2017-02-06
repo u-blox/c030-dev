@@ -20,7 +20,7 @@
  */
 
 // Define this to print debug information
-#define DEBUG_BQ24295
+//#define DEBUG_BQ24295
 
 #include <mbed.h>
 #include <lipo_charger_bq24295.h>

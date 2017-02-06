@@ -20,7 +20,7 @@
  */
 
 // Define this to print debug information
-#define DEBUG_BQ27441
+//#define DEBUG_BQ27441
 
 #include <mbed.h>
 #include <lipo_gauge_bq27441.h>

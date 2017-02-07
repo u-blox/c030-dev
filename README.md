@@ -6,6 +6,8 @@ This repo contains the early development code and associated tests for the C030 
 
 To fetch and build the code in this repository you must first install the [mbed CLI tools](https://github.com/ARMmbed/mbed-cli#installation) and their prerequisites; this will include a compiler (you can use GCC_ARM, ARM or IAR).  You will need to use `mbed config` to tell the mbed CLI tools where that compiler is.
 
+Then, to run the tests, you must install the [mbed test tools](https://github.com/ARMmbed/greentea/blob/master/docs/QUICKSTART.md).
+
 Until we have C030 boards, you will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC; we're using this for driver development as it includes the LiPo battery gauge, LiPo battery charger and primary cell battery gauge chips that we will use on the C030 board.
 
 # How To Test This Code
@@ -141,7 +143,7 @@ As well as the tests for the code in here, there is a `main.cpp` file which is u
 
 `mbed compile`
 
-You will find the output files in the sub-directory `BUILD\UBLOX_C027\ARM\`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the Vodafone UTM board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the Vodafone UTM board.  Press the `RESET_FB` button on the board and you should see serial output.
+You will find the output files in the sub-directory `BUILD/UBLOX_C027/ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the Vodafone UTM board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the Vodafone UTM board.  Press the `RESET_FB` button on the board and you should see serial output.
 
 # Other Things
 
@@ -153,6 +155,6 @@ By default mbed builds with maximum optimisation and no debug information, i.e. 
 
 `mbed compile -c --profile mbed-os/tools/profiles/debug.json`
 
-To run just that test, go and find the built binary (down in `BUILD\tests\...`) and drag/drop it onto the mbed mapped drive presented by the board.  To  run the test under a debugger, run `mbedls` as above to determine the COM port that your board is connected to.  Supposing it is `COM1`, you would then start the target board under your debugger and, on the PC side, enter the following to begin the test:
+To run just that test, go and find the built binary (down in `BUILD/tests/...`) and drag/drop it onto the mbed mapped drive presented by the board.  To  run the test under a debugger, run `mbedls` as above to determine the COM port that your board is connected to.  Supposing it is `COM1`, you would then start the target board under your debugger and, on the PC side, enter the following to begin the test:
 
 `mbedhtrun --skip-flashing --skip-reset -p COM1:9600`

@@ -232,7 +232,6 @@ LipoGaugeBq27441::LipoGaugeBq27441(void)
 /// Destructor.
 LipoGaugeBq27441::~LipoGaugeBq27441(void)
 {
-    gpI2c = NULL;
 }
 
 /// Initialise ourselves.

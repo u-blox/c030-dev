@@ -7,9 +7,10 @@
 using namespace utest::v1;
 
 // Pick some sensible minimum and maximum numbers
-#define MAX_VOLTAGE_READING 12 // Bigger than a 3 cell LiPo
-#define MAX_TEMPERATURE_READING_C  50
-#define MIN_TEMPERATURE_READING_C -10
+#define MAX_VOLTAGE_READING_MV 12000 // Bigger than a 3 cell LiPo
+#define MAX_CAPACITY_READING_MAH 30000 // A very big battery indeed
+#define MAX_TEMPERATURE_READING_C  80
+#define MIN_TEMPERATURE_READING_C -20
 
 // This required only for UTM board
 static DigitalOut gI2CPullUpBar(P1_1, 0);
@@ -27,15 +28,18 @@ void test_init() {
 // Test that a temperature reading can be performed
 void test_temperature() {
     LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
-    int8_t temperature;
+    int8_t temperatureC;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getTemperature(&temperature));
+    TEST_ASSERT_FALSE(pLipoGauge->getTemperature(&temperatureC));
     
+    // Normal case
     TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getTemperature(&temperature));
-    TEST_ASSERT(temperature >= MIN_TEMPERATURE_READING_C);
-    TEST_ASSERT(temperature <= MAX_TEMPERATURE_READING_C);
+    TEST_ASSERT(pLipoGauge->getTemperature(&temperatureC));
+    printf ("Temperature %d C.\n", temperatureC);
+    // Range check
+    TEST_ASSERT(temperatureC >= MIN_TEMPERATURE_READING_C);
+    TEST_ASSERT(temperatureC <= MAX_TEMPERATURE_READING_C);
     
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getTemperature(NULL));
@@ -44,14 +48,17 @@ void test_temperature() {
 // Test that a voltage reading can be performed
 void test_voltage() {
     LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
-    uint16_t voltage;
+    uint16_t voltageMV;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getVoltage(&voltage));
+    TEST_ASSERT_FALSE(pLipoGauge->getVoltage(&voltageMV));
     
+    // Normal case
     TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getVoltage(&voltage));
-    TEST_ASSERT(voltage >= MAX_VOLTAGE_READING);
+    TEST_ASSERT(pLipoGauge->getVoltage(&voltageMV));
+    printf ("Voltage %.3f V.\n", ((float) voltageMV) / 1000);
+    // Range check
+    TEST_ASSERT(voltageMV <= MAX_VOLTAGE_READING_MV);
     
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getVoltage(NULL));
@@ -65,8 +72,12 @@ void test_remaining_capacity() {
     // Call should fail if the LiPo gauge has not been initialised
     TEST_ASSERT_FALSE(pLipoGauge->getRemainingCapacity(&capacityMAh));
     
+    // Normal case
     TEST_ASSERT(pLipoGauge->init(gpI2C));
     TEST_ASSERT(pLipoGauge->getRemainingCapacity(&capacityMAh));
+    printf ("Remaining capacity %.3f Ah.\n", ((float) capacityMAh) / 1000);
+    // Range check
+    TEST_ASSERT(capacityMAh <= MAX_CAPACITY_READING_MAH);
 
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getRemainingCapacity(NULL));
@@ -80,8 +91,12 @@ void test_remaining_percentage() {
     // Call should fail if the LiPo gauge has not been initialised
     TEST_ASSERT_FALSE(pLipoGauge->getRemainingPercentage(&batteryPercent));
     
+    // Normal case
     TEST_ASSERT(pLipoGauge->init(gpI2C));
     TEST_ASSERT(pLipoGauge->getRemainingPercentage(&batteryPercent));
+    printf ("Remaining percentage %d%%.\n", batteryPercent);
+    // Range check
+    TEST_ASSERT(batteryPercent >= 0);
     TEST_ASSERT(batteryPercent <= 100);
 
     // The parameter is allowed to be NULL

@@ -143,7 +143,7 @@ As well as the tests for the code in here, there is a `main.cpp` file which is u
 
 `mbed compile`
 
-You will find the output files in the sub-directory `BUILD/UBLOX_C027/ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the Vodafone UTM board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the Vodafone UTM board.  Press the `RESET_FB` button on the board and you should see serial output.
+You will find the output files in the sub-directory `BUILD/UBLOX_C027/ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the Vodafone UTM board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the Vodafone UTM board.  Press the `RESET_FB` button on the board and you should see serial output. It doesn't do a great deal, that's what the tests are for.
 
 # Other Things
 

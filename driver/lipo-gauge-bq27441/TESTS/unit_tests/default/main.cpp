@@ -38,8 +38,8 @@ void test_temperature() {
     TEST_ASSERT(pLipoGauge->getTemperature(&temperatureC));
     printf ("Temperature %d C.\n", temperatureC);
     // Range check
-    TEST_ASSERT(temperatureC >= MIN_TEMPERATURE_READING_C);
-    TEST_ASSERT(temperatureC <= MAX_TEMPERATURE_READING_C);
+    TEST_ASSERT_INT8_WITHIN(MIN_TEMPERATURE_READING_C, 0, temperatureC);
+    TEST_ASSERT_INT8_WITHIN(MAX_TEMPERATURE_READING_C, 0, temperatureC);
     
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getTemperature(NULL));
@@ -58,7 +58,7 @@ void test_voltage() {
     TEST_ASSERT(pLipoGauge->getVoltage(&voltageMV));
     printf ("Voltage %.3f V.\n", ((float) voltageMV) / 1000);
     // Range check
-    TEST_ASSERT(voltageMV <= MAX_VOLTAGE_READING_MV);
+    TEST_ASSERT_UINT16_WITHIN(MAX_VOLTAGE_READING_MV, 0, voltageMV);
     
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getVoltage(NULL));
@@ -77,7 +77,7 @@ void test_remaining_capacity() {
     TEST_ASSERT(pLipoGauge->getRemainingCapacity(&capacityMAh));
     printf ("Remaining capacity %.3f Ah.\n", ((float) capacityMAh) / 1000);
     // Range check
-    TEST_ASSERT(capacityMAh <= MAX_CAPACITY_READING_MAH);
+    TEST_ASSERT_UINT32_WITHIN(MAX_CAPACITY_READING_MAH, 0, capacityMAh);
 
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getRemainingCapacity(NULL));
@@ -96,8 +96,7 @@ void test_remaining_percentage() {
     TEST_ASSERT(pLipoGauge->getRemainingPercentage(&batteryPercent));
     printf ("Remaining percentage %d%%.\n", batteryPercent);
     // Range check
-    TEST_ASSERT(batteryPercent >= 0);
-    TEST_ASSERT(batteryPercent <= 100);
+    TEST_ASSERT_UINT16_WITHIN(100, 0, batteryPercent);
 
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getRemainingPercentage(NULL));

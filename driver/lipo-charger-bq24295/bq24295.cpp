@@ -55,7 +55,6 @@ LipoChargerBq24295::LipoChargerBq24295(void)
 /// Destructor.
 LipoChargerBq24295::~LipoChargerBq24295(void)
 {
-    gpI2c = NULL;
 }
 
 /// Initialise ourselves.

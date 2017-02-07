@@ -78,10 +78,10 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 
 // Test cases
 Case cases[] = {
-    Case("Testing initialisation", test_init),
-    Case("Testing charger state read", test_charger_state),
-    Case("Testing external power presence", test_external_power_present),
-    Case("Testing charger fault read", test_charger_fault),
+    Case("Initialisation", test_init),
+    Case("Charger state read", test_charger_state),
+    Case("External power presence", test_external_power_present),
+    Case("Charger fault read", test_charger_fault),
 };
 
 Specification specification(test_setup, cases);

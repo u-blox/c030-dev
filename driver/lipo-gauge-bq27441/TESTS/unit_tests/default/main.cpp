@@ -38,8 +38,7 @@ void test_temperature() {
     TEST_ASSERT(pLipoGauge->getTemperature(&temperatureC));
     printf ("Temperature %d C.\n", temperatureC);
     // Range check
-    TEST_ASSERT_INT8_WITHIN(MIN_TEMPERATURE_READING_C, 0, temperatureC);
-    TEST_ASSERT_INT8_WITHIN(MAX_TEMPERATURE_READING_C, 0, temperatureC);
+    TEST_ASSERT_INT8_WITHIN(MIN_TEMPERATURE_READING_C, MAX_TEMPERATURE_READING_C, temperatureC);
     
     // The parameter is allowed to be NULL
     TEST_ASSERT(pLipoGauge->getTemperature(NULL));
@@ -111,11 +110,11 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 
 // Test cases
 Case cases[] = {
-    Case("Testing initialisation", test_init),
-    Case("Testing temperature reading", test_temperature),
-    Case("Testing voltage reading", test_voltage),
-    Case("Testing remaining capacity reading", test_remaining_capacity),
-    Case("Testing remaining percentage reading", test_remaining_percentage),
+    Case("Initialisation", test_init),
+    Case("Temperature read", test_temperature),
+    Case("Voltage read", test_voltage),
+    Case("Remaining capacity read", test_remaining_capacity),
+    Case("Remaining percentage read", test_remaining_percentage),
 };
 
 Specification specification(test_setup, cases);

@@ -33,6 +33,7 @@ static DigitalOut i2CPullUpBar(P1_1, 0);
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
 
+#if 0
 int main()
 {
     LipoChargerBq24295 * pLipoCharger = NULL;
@@ -68,7 +69,7 @@ int main()
         }
         
     } else {
-       printf("Unable to instantiate LiPo Gauge.\n");
+       printf("Unable to instantiate I2C.\n");
     }
 
     if (lipoChargerSuccess && lipoGaugeSuccess) {
@@ -77,6 +78,6 @@ int main()
     
     return 0;
 }
-
+#endif
 
 // End Of File

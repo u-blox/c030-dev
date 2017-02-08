@@ -79,6 +79,16 @@ protected:
     uint8_t gAddress;
     // Flag to indicate device is ready
     bool gReady;
+
+    /// Read two bytes starting at a given address.
+    // \param registerAddress the register address to start reading from.
+    // \param pBytes place to put the two bytes.
+    // \return true if successful, otherwise false.
+    bool getTwoBytes (uint8_t registerAddress, uint16_t *pBytes);
+    
+    // Make sure that an ADC reading has been performed recently.
+    // \return true if successful, otherwise false.
+    bool makeAdcReading (void);
 };
 
 #endif

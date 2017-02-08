@@ -2,7 +2,7 @@
 #include "greentea-client/test_env.h"
 #include "unity.h"
 #include "utest.h"
-#include "lipo_gauge_bq27441.h"
+#include "battery_gauge_bq27441.h"
 
 using namespace utest::v1;
 
@@ -19,86 +19,86 @@ I2C * gpI2C = new I2C(P0_27, P0_28);
 
 // Test that the BQ27441 LiPo gauge can be initialised
 void test_init() {
-    LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     
-    TEST_ASSERT_FALSE(pLipoGauge->init(NULL));
-    TEST_ASSERT(pLipoGauge->init(gpI2C));
+    TEST_ASSERT_FALSE(pBatteryGauge->init(NULL));
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
 }
 
 // Test that a temperature reading can be performed
 void test_temperature() {
-    LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     int8_t temperatureC;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getTemperature(&temperatureC));
+    TEST_ASSERT_FALSE(pBatteryGauge->getTemperature(&temperatureC));
     
     // Normal case
-    TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getTemperature(&temperatureC));
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->getTemperature(&temperatureC));
     printf ("Temperature %d C.\n", temperatureC);
     // Range check
     TEST_ASSERT_INT8_WITHIN(MIN_TEMPERATURE_READING_C, MAX_TEMPERATURE_READING_C, temperatureC);
     
     // The parameter is allowed to be NULL
-    TEST_ASSERT(pLipoGauge->getTemperature(NULL));
+    TEST_ASSERT(pBatteryGauge->getTemperature(NULL));
 }
 
 // Test that a voltage reading can be performed
 void test_voltage() {
-    LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint16_t voltageMV;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getVoltage(&voltageMV));
+    TEST_ASSERT_FALSE(pBatteryGauge->getVoltage(&voltageMV));
     
     // Normal case
-    TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getVoltage(&voltageMV));
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->getVoltage(&voltageMV));
     printf ("Voltage %.3f V.\n", ((float) voltageMV) / 1000);
     // Range check
     TEST_ASSERT_UINT16_WITHIN(MAX_VOLTAGE_READING_MV, 0, voltageMV);
     
     // The parameter is allowed to be NULL
-    TEST_ASSERT(pLipoGauge->getVoltage(NULL));
+    TEST_ASSERT(pBatteryGauge->getVoltage(NULL));
 }
 
 // Test that a remaining capacity reading can be performed
 void test_remaining_capacity() {
-    LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint32_t capacityMAh;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getRemainingCapacity(&capacityMAh));
+    TEST_ASSERT_FALSE(pBatteryGauge->getRemainingCapacity(&capacityMAh));
     
     // Normal case
-    TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getRemainingCapacity(&capacityMAh));
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->getRemainingCapacity(&capacityMAh));
     printf ("Remaining capacity %.3f Ah.\n", ((float) capacityMAh) / 1000);
     // Range check
     TEST_ASSERT_UINT32_WITHIN(MAX_CAPACITY_READING_MAH, 0, capacityMAh);
 
     // The parameter is allowed to be NULL
-    TEST_ASSERT(pLipoGauge->getRemainingCapacity(NULL));
+    TEST_ASSERT(pBatteryGauge->getRemainingCapacity(NULL));
 }
 
 // Test that a remaining percentage reading can be performed
 void test_remaining_percentage() {
-    LipoGaugeBq27441 * pLipoGauge = new LipoGaugeBq27441();
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint16_t batteryPercent;
     
     // Call should fail if the LiPo gauge has not been initialised
-    TEST_ASSERT_FALSE(pLipoGauge->getRemainingPercentage(&batteryPercent));
+    TEST_ASSERT_FALSE(pBatteryGauge->getRemainingPercentage(&batteryPercent));
     
     // Normal case
-    TEST_ASSERT(pLipoGauge->init(gpI2C));
-    TEST_ASSERT(pLipoGauge->getRemainingPercentage(&batteryPercent));
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->getRemainingPercentage(&batteryPercent));
     printf ("Remaining percentage %d%%.\n", batteryPercent);
     // Range check
     TEST_ASSERT_UINT16_WITHIN(100, 0, batteryPercent);
 
     // The parameter is allowed to be NULL
-    TEST_ASSERT(pLipoGauge->getRemainingPercentage(NULL));
+    TEST_ASSERT(pBatteryGauge->getRemainingPercentage(NULL));
 }
 
 // Setup the test environment

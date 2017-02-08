@@ -8,7 +8,7 @@ To fetch and build the code in this repository you must first install the [mbed 
 
 Then, to run the tests, you must install the [mbed test tools](https://github.com/ARMmbed/greentea/blob/master/docs/QUICKSTART.md).
 
-Until we have C030 boards, you will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC; we're using this for driver development as it includes the LiPo battery gauge, LiPo battery charger and primary cell battery gauge chips that we will use on the C030 board.
+Until we have C030 boards, you will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC; we're using this for driver development as it includes the LiPo battery gauge, LiPo battery charger and external battery gauge chips that we will use on the C030 board.
 
 # How To Test This Code
 
@@ -92,7 +92,7 @@ Allocated Stack: unknown
 Total Static RAM memory (data + bss): 10272 bytes
 Total RAM memory (data + bss + heap + stack): 10272 bytes
 Total Flash memory (text + data + misc): 37025 bytes
-Image: BUILD/tests/UBLOX_C027/ARM/driver/lipo-gauge-bq27441/TESTS/unit_tests/default/default.bin
+Image: BUILD/tests/UBLOX_C027/ARM/driver/battery-gauge-bq27441/TESTS/unit_tests/default/default.bin
 
 
 Memory map breakdown for built projects (values in Bytes):
@@ -103,7 +103,7 @@ Memory map breakdown for built projects (values in Bytes):
 +---------+------------+-----------+------------+-------+------+-----------+-------------+
 
 Build successes:
-  * UBLOX_C027::ARM::DRIVER-LIPO-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
+  * UBLOX_C027::ARM::DRIVER-BATTERY-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
   * UBLOX_C027::ARM::MBED-BUILD
 mbedgt: greentea test automation tool ver. 1.2.2
 mbedgt: test specification file 'C:\projects\c030\BUILD\tests\UBLOX_C027\ARM\test_spec.json' (specified with --test-spec option)
@@ -112,29 +112,29 @@ mbedgt: detecting connected mbed-enabled devices...
 mbedgt: detected 1 device
 mbedgt: processing target 'UBLOX_C027' toolchain 'ARM' compatible platforms... (note: switch set to --parallel 1)
 mbedgt: test case filter (specified with -n option)
-        test filtered in 'driver-lipo-gauge-bq27441-tests-unit_tests-default'
+        test filtered in 'driver-battery-gauge-bq27441-tests-unit_tests-default'
 mbedgt: running 1 test for platform 'UBLOX_C027' and toolchain 'ARM'
 mbedgt: mbed-host-test-runner: started
 mbedgt: checking for GCOV data...
 mbedgt: test on hardware with target id: 12340201E3953CC69934E380
-mbedgt: test suite 'driver-lipo-gauge-bq27441-tests-unit_tests-default' .............................. OK in 10.46 sec
+mbedgt: test suite 'driver-battery-gauge-bq27441-tests-unit_tests-default' .............................. OK in 10.46 sec
         test case: 'Testing initialisation' .......................................................... OK in 0.05 sec
 mbedgt: test case summary: 1 pass, 0 failures
 mbedgt: all tests finished!
 mbedgt: shuffle seed: 0.7592919699
 mbedgt: test suite report:
-+----------------+---------------+----------------------------------------------------+--------+--------------------+-------------+
-| target         | platform_name | test suite                                         | result | elapsed_time (sec) | copy_method |
-+----------------+---------------+----------------------------------------------------+--------+--------------------+-------------+
-| UBLOX_C027-ARM | UBLOX_C027    | driver-lipo-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
-+----------------+---------------+----------------------------------------------------+--------+--------------------+-------------+
++----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
+| target         | platform_name | test suite                                            | result | elapsed_time (sec) | copy_method |
++----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
+| UBLOX_C027-ARM | UBLOX_C027    | driver-battery-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
++----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
 mbedgt: test suite results: 1 OK
 mbedgt: test case report:
-+----------------+---------------+----------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-| target         | platform_name | test suite                                         | test case              | passed | failed | result | elapsed_time (sec) |
-+----------------+---------------+----------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-| UBLOX_C027-ARM | UBLOX_C027    | driver-lipo-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
-+----------------+---------------+----------------------------------------------------+------------------------+--------+--------+--------+--------------------+
++----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+| target         | platform_name | test suite                                            | test case              | passed | failed | result | elapsed_time (sec) |
++----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+| UBLOX_C027-ARM | UBLOX_C027    | driver-battery-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
++----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
 ```
 
 # What To Do If You Are Not Interested In Tests

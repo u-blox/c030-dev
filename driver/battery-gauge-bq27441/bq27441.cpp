@@ -16,14 +16,14 @@
 
 /**
  * @file bq27441.cpp
- * This file defines the API to the TI BQ27441 Coulomb counter chip.
+ * This file defines the API to the TI BQ27441 battery gauge chip.
  */
 
 // Define this to print debug information
 //#define DEBUG_BQ27441
 
 #include <mbed.h>
-#include <lipo_gauge_bq27441.h>
+#include <battery_gauge_bq27441.h>
 
 #ifdef DEBUG_BQ27441
 # include <stdio.h>
@@ -45,7 +45,7 @@
 // ----------------------------------------------------------------
 
 // Read two bytes from an address
-bool LipoGaugeBq27441::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes)
+bool BatteryGaugeBq27441::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes)
 {
     bool success = false;
     char data[3];
@@ -69,7 +69,7 @@ bool LipoGaugeBq27441::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes)
 }
 
 // Compute the checksum of the current set of block data
-uint8_t LipoGaugeBq27441::computeChecksum()
+uint8_t BatteryGaugeBq27441::computeChecksum()
 {
     char data[32 + 1];
     uint8_t checkSum = 0;
@@ -92,7 +92,7 @@ uint8_t LipoGaugeBq27441::computeChecksum()
 // Write data of a given length and class ID to a given offset.  This code taken from
 // section 3.1 of the SLUUAC9A application technical reference manual with hints from:
 // https://github.com/sparkfun/SparkFun_BQ27441_Arduino_Library/blob/master/src/SparkFunBQ27441.cpp.
-bool LipoGaugeBq27441::writeExtendedData(uint8_t classId, uint8_t offset, const char * pData, uint8_t len)
+bool BatteryGaugeBq27441::writeExtendedData(uint8_t classId, uint8_t offset, const char * pData, uint8_t len)
 {
     bool success = false;
     char data[3];
@@ -165,52 +165,52 @@ bool LipoGaugeBq27441::writeExtendedData(uint8_t classId, uint8_t offset, const 
                                                 success = true;
                                             } else {
 #ifdef DEBUG_BQ27441
-                                                printf("LipoGaugeBq27441 (I2C 0x%02x): Flags register didn't show config update flag unset in time.\r\n", gAddress >> 1);
+                                                printf("BatteryGaugeBq27441 (I2C 0x%02x): Flags register didn't show config update flag unset in time.\r\n", gAddress >> 1);
 #endif        
                                             }
                                         } else {
 #ifdef DEBUG_BQ27441
-                                            printf("LipoGaugeBq27441 (I2C 0x%02x): unable to write config update exit after update.\r\n", gAddress >> 1);
+                                            printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to write config update exit after update.\r\n", gAddress >> 1);
 #endif        
                                         }
                                     } else {
 #ifdef DEBUG_BQ27441
-                                        printf("LipoGaugeBq27441 (I2C 0x%02x): unable to write new checksum (0x%02x) during config update.\r\n", gAddress >> 1, data[1]);
+                                        printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to write new checksum (0x%02x) during config update.\r\n", gAddress >> 1, data[1]);
 #endif
                                     }
                                 } else {
 #ifdef DEBUG_BQ27441
-                                    printf("LipoGaugeBq27441 (I2C 0x%02x): couldn't write all %d bytes during config update.\r\n", gAddress >> 1, len);
+                                    printf("BatteryGaugeBq27441 (I2C 0x%02x): couldn't write all %d bytes during config update.\r\n", gAddress >> 1, len);
 #endif
                                 }
                             } else {
 #ifdef DEBUG_BQ27441
-                                printf("LipoGaugeBq27441 (I2C 0x%02x): unable to read Block Data Checksum for config update.\r\n", gAddress >> 1);
+                                printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to read Block Data Checksum for config update.\r\n", gAddress >> 1);
 #endif
                             }
                         } else {
 #ifdef DEBUG_BQ27441
-                            printf("LipoGaugeBq27441 (I2C 0x%02x): unable to write Block Offset (%d) for config update.\r\n", gAddress >> 1, data[1]);
+                            printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to write Block Offset (%d) for config update.\r\n", gAddress >> 1, data[1]);
 #endif
                         }
                     } else {
 #ifdef DEBUG_BQ27441
-                        printf("LipoGaugeBq27441 (I2C 0x%02x): unable set Class ID (0x%02x) for config update.\r\n", gAddress >> 1, classId);
+                        printf("BatteryGaugeBq27441 (I2C 0x%02x): unable set Class ID (0x%02x) for config update.\r\n", gAddress >> 1, classId);
 #endif
                     }
                 } else {
 #ifdef DEBUG_BQ27441
-                    printf("LipoGaugeBq27441 (I2C 0x%02x): unable to set Block Data Control for config update.\r\n", gAddress >> 1);
+                    printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to set Block Data Control for config update.\r\n", gAddress >> 1);
 #endif
                 }
             } else {
 #ifdef DEBUG_BQ27441
-                printf("LipoGaugeBq27441 (I2C 0x%02x): Flags register didn't show config update flag set in time.\r\n", gAddress >> 1);
+                printf("BatteryGaugeBq27441 (I2C 0x%02x): Flags register didn't show config update flag set in time.\r\n", gAddress >> 1);
 #endif
             }
         } else {
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): unable to write to control register for config update.\r\n", gAddress >> 1);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): unable to write to control register for config update.\r\n", gAddress >> 1);
 #endif
         }
     }
@@ -223,19 +223,19 @@ bool LipoGaugeBq27441::writeExtendedData(uint8_t classId, uint8_t offset, const 
 // ----------------------------------------------------------------
 
 /// Constructor.
-LipoGaugeBq27441::LipoGaugeBq27441(void)
+BatteryGaugeBq27441::BatteryGaugeBq27441(void)
 {
     gpI2c = NULL;
     gReady = false;
 }
 
 /// Destructor.
-LipoGaugeBq27441::~LipoGaugeBq27441(void)
+BatteryGaugeBq27441::~BatteryGaugeBq27441(void)
 {
 }
 
 /// Initialise ourselves.
-bool LipoGaugeBq27441::init (I2C * pI2c, uint8_t address)
+bool BatteryGaugeBq27441::init (I2C * pI2c, uint32_t rSenseMOhm, uint8_t address)
 {
     bool success = false;
     char data[3];
@@ -258,7 +258,7 @@ bool LipoGaugeBq27441::init (I2C * pI2c, uint8_t address)
                     gReady = true;
                 }
 #ifdef DEBUG_BQ27441
-                printf("LipoGaugeBq27441 (I2C 0x%02x): read 0x%04x as FW_VERSION, expected 0x0109.\r\n", gAddress >> 1, answer);
+                printf("BatteryGaugeBq27441 (I2C 0x%02x): read 0x%04x as FW_VERSION, expected 0x0109.\r\n", gAddress >> 1, answer);
 #endif
             }
         }
@@ -266,6 +266,8 @@ bool LipoGaugeBq27441::init (I2C * pI2c, uint8_t address)
 
     if (success)
     {
+        // TODO: set up RSense
+        
         // Read from the OpConfig register address
         if (getTwoBytes (0x3A, &answer)) {
             // If BATLOWEN (bit 3) is not set, set it
@@ -277,7 +279,7 @@ bool LipoGaugeBq27441::init (I2C * pI2c, uint8_t address)
             }
 
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): OpConfig register contents set to 0x%04x.\r\n", gAddress >> 1, answer);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig register contents set to 0x%04x.\r\n", gAddress >> 1, answer);
 #endif
         } else {
             success = false;
@@ -286,17 +288,17 @@ bool LipoGaugeBq27441::init (I2C * pI2c, uint8_t address)
 
 #ifdef DEBUG_BQ27441
     if (success) {
-        printf("LipoGaugeBq27441 (I2C 0x%02x): handler initialised.\r\n", gAddress >> 1);
+        printf("BatteryGaugeBq27441 (I2C 0x%02x): handler initialised.\r\n", gAddress >> 1);
     } else {
-        printf("LipoGaugeBq27441 (I2C 0x%02x): device NOT found.\r\n", gAddress >> 1);
+        printf("BatteryGaugeBq27441 (I2C 0x%02x): device NOT found.\r\n", gAddress >> 1);
     }
 #endif
 
     return success;
 }
 
-/// Get the temperature of the Coulomb counter chip.
-bool LipoGaugeBq27441::getTemperature (int8_t *pTemperatureC)
+/// Get the temperature of the chip.
+bool BatteryGaugeBq27441::getTemperature (int8_t *pTemperatureC)
 {
     bool success = false;
     int32_t temperature = 0;
@@ -317,7 +319,7 @@ bool LipoGaugeBq27441::getTemperature (int8_t *pTemperatureC)
             }
 
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): chip temperature %.1f K, so %d C.\r\n", gAddress >> 1, ((float) data) / 10, (int) temperature);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): chip temperature %.1f K, so %d C.\r\n", gAddress >> 1, ((float) data) / 10, (int) temperature);
 #endif
         }
     }
@@ -326,7 +328,7 @@ bool LipoGaugeBq27441::getTemperature (int8_t *pTemperatureC)
 }
 
 /// Get the Voltage of the battery.
-bool LipoGaugeBq27441::getVoltage (uint16_t *pVoltageMV)
+bool BatteryGaugeBq27441::getVoltage (uint16_t *pVoltageMV)
 {
     bool success = false;
     uint16_t voltage = 0;
@@ -342,7 +344,7 @@ bool LipoGaugeBq27441::getVoltage (uint16_t *pVoltageMV)
             }
 
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): battery voltage %.3f V.\r\n", gAddress >> 1, ((float) voltage) / 1000);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): battery voltage %.3f V.\r\n", gAddress >> 1, ((float) voltage) / 1000);
 #endif
         }
     }
@@ -351,7 +353,7 @@ bool LipoGaugeBq27441::getVoltage (uint16_t *pVoltageMV)
 }
 
 /// Get the remaining battery capacity.
-bool LipoGaugeBq27441::getRemainingCapacity (uint32_t *pCapacityMAh)
+bool BatteryGaugeBq27441::getRemainingCapacity (uint32_t *pCapacityMAh)
 {
     bool success = false;
     uint16_t data = 0;
@@ -368,7 +370,7 @@ bool LipoGaugeBq27441::getRemainingCapacity (uint32_t *pCapacityMAh)
             }
 
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): remaining battery capacity %u mAh.\r\n", gAddress >> 1, data);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): remaining battery capacity %u mAh.\r\n", gAddress >> 1, data);
 #endif
         }
     }
@@ -377,7 +379,7 @@ bool LipoGaugeBq27441::getRemainingCapacity (uint32_t *pCapacityMAh)
 }
 
 /// Get the battery percentage remaining
-bool LipoGaugeBq27441::getRemainingPercentage (uint16_t *pBatteryPercent)
+bool BatteryGaugeBq27441::getRemainingPercentage (uint16_t *pBatteryPercent)
 {
     bool success = false;
     uint16_t data = 0;
@@ -392,7 +394,7 @@ bool LipoGaugeBq27441::getRemainingPercentage (uint16_t *pBatteryPercent)
             }
 
 #ifdef DEBUG_BQ27441
-            printf("LipoGaugeBq27441 (I2C 0x%02x): remaining battery percentage %u%%.\r\n", gAddress >> 1, data);
+            printf("BatteryGaugeBq27441 (I2C 0x%02x): remaining battery percentage %u%%.\r\n", gAddress >> 1, data);
 #endif
         }
     }

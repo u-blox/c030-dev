@@ -15,8 +15,9 @@
  */
 
 #include "mbed.h"
-#include "lipo_charger_bq24295.h"
-#include "lipo_gauge_bq27441.h"
+#include "battery_charger_bq24295.h"
+#include "battery_gauge_bq27441.h"
+#include "battery_gauge_ltc2943.h"
 
 /**
  * @file main.cpp
@@ -36,11 +37,13 @@ static DigitalOut i2CPullUpBar(P1_1, 0);
 #if 0
 int main()
 {
-    LipoChargerBq24295 * pLipoCharger = NULL;
-    LipoGaugeBq27441 * pLipoGauge = NULL;
+    BatteryChargerBq24295 * pBatteryCharger = NULL;
+    BatteryGaugeBq27441 * pBatteryGaugeBq27441 = NULL;
+    BatteryGaugeLtc2943 * pBatteryGaugeLtc2943 = NULL;
     I2C * pI2C = NULL;
-    bool lipoChargerSuccess = false;
-    bool lipoGaugeSuccess = false;
+    bool chargerSuccess = false;
+    bool gaugeBq27441Success = false;
+    bool gaugeLtc2943Success = false;
     
     printf("Starting up...\n");
     
@@ -48,32 +51,42 @@ int main()
     
     if (pI2C != NULL) {
         
-        pLipoCharger = new LipoChargerBq24295();
-        if (pLipoCharger != NULL) {
-            lipoChargerSuccess = pLipoCharger->init(pI2C);
-            if (!lipoChargerSuccess) {
+        pBatteryCharger = new BatteryChargerBq24295();
+        if (pBatteryCharger != NULL) {
+            chargerSuccess = pBatteryCharger->init(pI2C);
+            if (!chargerSuccess) {
                 printf ("Unable to initialise LiPo Charger.\n");
             }
         } else {
           printf("Unable to instantiate LiPo Charger.\n");
         }          
       
-        pLipoGauge = new LipoGaugeBq27441();
-        if (pLipoGauge != NULL) {
-            lipoGaugeSuccess = pLipoGauge->init(pI2C);
-            if (!lipoGaugeSuccess) {
-                printf ("Unable to initialise LiPo Gauge.\n");
+        pBatteryGaugeBq27441 = new BatteryGaugeBq27441();
+        if (pBatteryGaugeBq27441 != NULL) {
+            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C);
+            if (!gaugeBq27441Success) {
+                printf ("Unable to initialise BQ27441 LiPo Gauge.\n");
             }
         } else {
-            printf("Unable to instantiate LiPo Gauge.\n");
+            printf("Unable to instantiate BQ27441 LiPo Gauge.\n");
+        }
+        
+        pBatteryGaugeLtc2943 = new BatteryGaugeLtc2943();
+        if (pBatteryGaugeLtc2943 != NULL) {
+            gaugeLtc2943Success = pBatteryGaugeLtc2943->init(pI2C);
+            if (!gaugeLtc2943Success) {
+                printf ("Unable to initialise LTC2943 LiPo Gauge.\n");
+            }
+        } else {
+            printf("Unable to instantiate LTC2943 LiPo Gauge.\n");
         }
         
     } else {
        printf("Unable to instantiate I2C.\n");
     }
 
-    if (lipoChargerSuccess && lipoGaugeSuccess) {
-        printf ("LipoCharger and LipoGauge ready.\n");
+    if (chargerSuccess && gaugeBq27441Success && gaugeLtc2943Success) {
+        printf ("BQ24295 battery charger, BQ27441 battery gauge and LTC2943 battery gauge ready.\n");
     }
     
     return 0;

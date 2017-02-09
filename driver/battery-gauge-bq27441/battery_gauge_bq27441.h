@@ -28,8 +28,6 @@
 
 /// Device I2C address
 #define BATTERY_GAUGE_BQ27441_ADDRESS 0x55
-/// Default RSense (in mOhm)
-#define BATTERY_GAUGE_BQ27441_RSENSE_MOHM 10
 
 // ----------------------------------------------------------------
 // CLASSES
@@ -48,27 +46,27 @@ public:
     // \param rSenseMOhm the value of the sense resistor being used, in milli Ohms.
     //\ param address 7-bit I2C address of the battery gauge chip.
     // \return true if successful, otherwise false.
-    bool init (I2C * pI2c, uint32_t rSenseMOhm = BATTERY_GAUGE_BQ27441_RSENSE_MOHM, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
+    bool init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
 
     /// Read the temperature of the BQ27441 chip.
     // \param pTemperatureC place to put the temperature reading.
     // \return true if successful, otherwise false.
-    bool getTemperature (int8_t *pTemperatureC);
+    bool getTemperature (int32_t *pTemperatureC);
 
     /// Read the voltage of the battery.
     // \param pVoltageMV place to put the voltage reading.
     // \return true if successful, otherwise false.
-    bool getVoltage (uint16_t *pVoltageMV);
+    bool getVoltage (int32_t *pVoltageMV);
 
     /// Read the remaining available battery energy.
     // \param pCapacityMAh place to put the capacity reading.
     // \return true if successful, otherwise false.
-    bool getRemainingCapacity (uint32_t *pCapacityMAh);
+    bool getRemainingCapacity (int32_t *pCapacityMAh);
 
     /// Read the state of charge of the battery as a percentage.
     // \param pBatteryPercent place to put the reading.
     // \return true if successful, otherwise false.
-    bool getRemainingPercentage (uint16_t *pBatteryPercent);
+    bool getRemainingPercentage (int32_t *pBatteryPercent);
 
 protected:
     /// Pointer to the I2C interface.

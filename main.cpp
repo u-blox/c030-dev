@@ -30,6 +30,13 @@ static DigitalOut i2CPullUpBar(P1_1, 0);
 #define PIN_I2C_SDA  P0_27
 #define PIN_I2C_SCL  P0_28
  
+/// RSense (in mOhm) on UTM board for LTC2943 battery gauge
+#define LTC2943_RSENSE_MOHM 68
+
+/// Default RSense (in mOhm) for BQ27441 battery gauge
+#define BQ27441_RSENSE_MOHM 10
+
+ 
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
@@ -63,7 +70,7 @@ int main()
       
         pBatteryGaugeBq27441 = new BatteryGaugeBq27441();
         if (pBatteryGaugeBq27441 != NULL) {
-            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C);
+            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C, BQ27441_RSENSE_MOHM);
             if (!gaugeBq27441Success) {
                 printf ("Unable to initialise BQ27441 battery gauge chip.\n");
             }
@@ -73,7 +80,7 @@ int main()
         
         pBatteryGaugeLtc2943 = new BatteryGaugeLtc2943();
         if (pBatteryGaugeLtc2943 != NULL) {
-            gaugeLtc2943Success = pBatteryGaugeLtc2943->init(pI2C);
+            gaugeLtc2943Success = pBatteryGaugeLtc2943->init(pI2C, LTC2943_RSENSE_MOHM);
             if (!gaugeLtc2943Success) {
                 printf ("Unable to initialise LTC2943 battery gauge chip.\n");
             }

@@ -14,13 +14,25 @@ using namespace utest::v1;
 #define MAX_TEMPERATURE_READING_C  80
 #define MIN_TEMPERATURE_READING_C -20
 
-/// Default RSense (in mOhm)
+#ifndef RSENSE_MOHM
+// RSense (in mOhm) on UTM board
 #define RSENSE_MOHM 10
+#endif
+
+#ifndef PIN_I2C_SDA
+// Default for UTM board
+#define PIN_I2C_SDA P0_27
+#endif
+
+#ifndef PIN_I2C_SDC
+// Default for UTM board
+#define PIN_I2C_SDC P0_28
+#endif
 
 // This required only for UTM board
 static DigitalOut gI2CPullUpBar(P1_1, 0);
 // I2C interface
-I2C * gpI2C = new I2C(P0_27, P0_28);
+I2C * gpI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SDC);
 
 // Test that the BQ27441 battery gauge can be initialised
 void test_init() {

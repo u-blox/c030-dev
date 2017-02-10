@@ -69,6 +69,26 @@ bool BatteryGaugeLtc2943::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes
     return success;
 }
 
+/// Set two bytes, starting from an address.
+bool BatteryGaugeLtc2943::setTwoBytes (uint8_t registerAddress, uint16_t bytes)
+{
+    bool success = false;
+    char data[3];
+
+    if (gpI2c != NULL) {
+        // Send a command to write from registerAddress
+        data[0] = registerAddress;
+        data[1] = (char) (bytes >> 8);
+        data[2] = (char) bytes;
+
+        if (gpI2c->write(gAddress, &(data[0]), 3) == 0) {
+            success = true;
+        }
+    }
+
+    return success;
+}
+
 /// Ensure that the ADC of the chip has taken a reading recently.
 bool BatteryGaugeLtc2943::makeAdcReading (void)
 {
@@ -114,7 +134,26 @@ int32_t BatteryGaugeLtc2943::registerToTemperatureC (uint16_t data)
 {
     // From the data sheet the temperature (in Kelvin) is
     // T = 510 * data / 0xFFFF    
-    return (((uint32_t) data * 510) >> 16) - 273;;
+    return (((uint32_t) data * 510) >> 16) - 273;
+}
+
+/// Convert a temperature in C to a register value.
+uint16_t BatteryGaugeLtc2943::temperatureCToRegister (int32_t temperatureC)
+{
+    int32_t registerValue;
+    
+    // Rearranging from the above 
+    // register = T(Kelvin) * 0xFFFF / 510
+    registerValue = ((temperatureC << 16) / 510) + 273;
+    
+    if (registerValue > 0xFFFF) {
+        registerValue = 0xFFFF;
+    }
+    if (registerValue < 0) {
+        registerValue = 0;
+    }
+    
+    return (uint16_t) registerValue;
 }
 
 /// Convert a 16 bit register reading into a voltage reading in mV.
@@ -125,13 +164,79 @@ int32_t BatteryGaugeLtc2943::registerToVoltageMV (uint16_t data)
     return (((int32_t) data) * 23600) >> 16;
 }
 
+/// Convert a voltage in mV to a register value.
+uint16_t BatteryGaugeLtc2943::voltageMVToRegister (int32_t voltageMV)
+{
+    int32_t registerValue;
+    
+    // Rearranging from the above 
+    // register = V * 0xFFFF / 23600
+    registerValue = (voltageMV << 16) / 23600;
+    
+    if (registerValue > 0xFFFF) {
+        registerValue = 0xFFFF;
+    }
+    if (registerValue < 0) {
+        registerValue = 0;
+    }
+    
+    return (uint16_t) registerValue;
+}
+
 /// Convert a 16 bit register reading into a current reading in mA.
 int32_t BatteryGaugeLtc2943::registerToCurrentMA (uint16_t data, int32_t rSenseMOhm)
 {
     // From the data sheet, max current corresponds to 0xFFFF
-    // (which is 60 mV across rSense) while min (most negative)
-    // current corresponds to 0 (which is -60 mV across rSense).    
-    return (((int32_t) (data - 0x7FFF)) * 60 >> 15) / rSenseMOhm;;
+    // (which is 60 mV across RSense) while min (most negative)
+    // current corresponds to 0 (which is -60 mV across RSense).
+    return (((int32_t) (data - 0x7FFF)) * 60 >> 15) / rSenseMOhm;
+}
+
+/// Convert a current in mA to a register value.
+uint16_t BatteryGaugeLtc2943::currentMAToRegister (int32_t currentMA, int32_t rSenseMOhm)
+{
+    int32_t registerValue;
+    
+    // Rearranging from the above 
+    // register = ((current * rSenseMOhm) << 15) / 60 + 0x7FFF
+    registerValue = (((currentMA * rSenseMOhm) << 15) / 60) + 0x7FFF;
+    
+    if (registerValue > 0xFFFF) {
+        registerValue = 0xFFFF;
+    }
+    if (registerValue < 0) {
+        registerValue = 0;
+    }
+    
+    return (uint16_t) registerValue;
+}
+
+/// Convert a 16 bit register reading into a charge reading in mAh.
+int32_t BatteryGaugeLtc2943::registerToChargeMAH (uint16_t data, int32_t rSenseMOhm, int32_t prescaler)
+{
+    // From the data sheet, each bit of the charge registers has
+    // the following value in mAh:
+    // 0.34 * 50 * prescaler / RSense / 4096.
+    return ((((int32_t) data) * 17 * prescaler) / rSenseMOhm) >> 12;
+}
+
+/// Convert a charge in mAh to a register value.
+uint16_t BatteryGaugeLtc2943::chargeMAHToRegister (int32_t chargeMAH, int32_t rSenseMOhm, int32_t prescaler)
+{
+    int32_t registerValue;
+    
+    // Rearranging from the above 
+    // register = ((chargeMAH << 12) * rSenseMOhm) / prescaler / 17
+    registerValue = ((chargeMAH << 12) * rSenseMOhm) / prescaler / 17;
+    
+    if (registerValue > 0xFFFF) {
+        registerValue = 0xFFFF;
+    }
+    if (registerValue < 0) {
+        registerValue = 0;
+    }
+    
+    return (uint16_t) registerValue;
 }
 
 //----------------------------------------------------------------
@@ -143,7 +248,7 @@ BatteryGaugeLtc2943::BatteryGaugeLtc2943(void)
 {
     gpI2c = NULL;
     gReady = false;
-    gRemainingChargeKnown = false;
+    gBatteryCapacityMAH = 0;
 }
 
 /// Destructor.
@@ -159,6 +264,7 @@ bool BatteryGaugeLtc2943::init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address,
     gpI2c = pI2c;
     gAddress = address << 1;
     gRSenseMOhm = rSenseMOhm;
+    gPrescaler = prescaler;
     
     MBED_ASSERT(alcc < MAX_NUM_ALCCS);
 
@@ -196,6 +302,7 @@ bool BatteryGaugeLtc2943::init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address,
                 data[1] |= 6 << 3;
             break;
             default:
+                gPrescaler = 0;
                 MBED_ASSERT(false);
             break;
         }
@@ -217,7 +324,7 @@ bool BatteryGaugeLtc2943::init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address,
     return gReady;
 }
 
-// Set whether battery capacity monitoring is on or off
+// Set whether battery charge monitoring is on or off
 bool BatteryGaugeLtc2943::setMonitor (bool onNotOff, bool isSlow)
 {
     bool success = false;
@@ -316,7 +423,7 @@ bool BatteryGaugeLtc2943::getVoltage (int32_t *pVoltageMV)
     return success;
 }
 
-/// Get the current flowing through rSense.
+/// Get the current flowing through RSense.
 bool BatteryGaugeLtc2943::getCurrent (int32_t *pCurrentMA)
 {
     bool success = false;
@@ -329,7 +436,7 @@ bool BatteryGaugeLtc2943::getCurrent (int32_t *pCurrentMA)
                 success = true;
 
                 if (pCurrentMA) {
-                    *pCurrentMA = registerToCurrentMA (data, gRSenseMOhm);;
+                    *pCurrentMA = registerToCurrentMA (data, gRSenseMOhm);
                 }
 
 #ifdef DEBUG_LTC2943
@@ -344,287 +451,611 @@ bool BatteryGaugeLtc2943::getCurrent (int32_t *pCurrentMA)
 }
 
 /// Tell the LTC2943 chip that charging is complete.
-bool setChargingComplete (void)
+bool BatteryGaugeLtc2943::setChargingComplete (int32_t capacityMAH)
 {
     bool success = false;
+    bool analoguePowerReady = true;
+    char data[2];
     
-    // TODO complete
+    if (gReady && (gpI2c != NULL)) {
+        // First read the control register as we have to power
+        // down the analogue parts when setting the charge registers
+        data[0] = 0x01;  // Address of the control register
+        data[1] = 0;
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
+                
+            // If the power down bit is not set, set it
+            if ((data[1] & 0x01) != 0x01) {
+                data[1] |= 0x01;
+                if (gpI2c->write(gAddress, &(data[0]), 2) != 0) {
+                    analoguePowerReady = false;
+                }
+            }
+            
+            if (analoguePowerReady) {
+                // Remember the battery charge
+                gBatteryCapacityMAH = capacityMAH;
+                
+                // Set the charge counter to max
+                success = setTwoBytes(0x02, 0xFFFF);
+    
+                // If the ADC mode, in bits 6 and 7, is not zero then
+                // we must switch on the analogue power again.
+                if ((data[1] & 0xC0) != 0) {
+                    data[1] &= ~0x01;
+                    if (gpI2c->write(gAddress, &(data[0]), 2) != 0) {
+                        success = false;
+                    }
+                }
+            }
+        }
+    }
 
     return success;
 }
 
-/// Get the remaining battery capacity.
-bool BatteryGaugeLtc2943::getRemainingCapacity (int32_t *pCapacityMAh)
+/// Get the remaining battery charge.
+bool BatteryGaugeLtc2943::getRemainingCharge (int32_t *pChargeMAH)
 {
     bool success = false;
-    
-    // TODO complete
+    int32_t chargeMAH;
+    uint16_t data;
 
+    if (gReady && (gpI2c != NULL)){
+        // Read from the charge accumulator register address
+        if (getTwoBytes (0x02, &data)) {
+            success = true;
+            
+            // Full scale corresponds to the capacity of the battery when
+            // fully charged, so the capacity used is 0xFFFF - data            
+            chargeMAH = registerToChargeMAH (0xFFFF - data, gRSenseMOhm, gPrescaler);
+            
+            if (pChargeMAH) {
+                *pChargeMAH = gBatteryCapacityMAH - chargeMAH;
+                if (gBatteryCapacityMAH == 0) {
+                    // If gBatteryCapacityMAH is 0, we can't actually calculate the remaining
+                    // capacity but we can calculate the charge used using the fact that the default
+                    // starting value is 0x7FFF.  So set success to false so that the user knows
+                    // we can't supply what was requested but report the charge used number anyway
+                    // in case it is useful
+                    success = false;
+                    *pChargeMAH = registerToChargeMAH (data - 0x7FFF, gRSenseMOhm, gPrescaler);
+                }
+            }
+
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge accumulator registers report 0x%04x, battery capacity is %d giving a charge remaining of %.3f AH.\n",
+                   gAddress >> 1, data, gBatteryCapacityMAH, (float) (gBatteryCapacityMAH - chargeMAH) / 1000);
+#endif
+        }
+    }
+        
     return success;
 }
 
 /// Get the battery percentage remaining.
 bool BatteryGaugeLtc2943::getRemainingPercentage (int32_t *pBatteryPercent)
 {
-    bool success = false;
-    
-    // TODO complete
+    bool success;
+    int32_t chargeMAH;
 
+    success = getRemainingCharge (&chargeMAH);
+
+    if (success) {
+        if (pBatteryPercent) {
+            *pBatteryPercent = 100 * gBatteryCapacityMAH / chargeMAH;
+        }
+        
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): remaining charge is %d mAh, battery capacity is %d mAh, so percentage remaining is %d%%.\n",
+               gAddress >> 1, chargeMAH, gBatteryCapacityMAH, 100 * gBatteryCapacityMAH / chargeMAH);
+#endif
+    }
+    
     return success;
 }
 
-/// Get the reason for an alert.
-BatteryGaugeLtc2943::Alert getAlertReason (void)
+/// Get the reason(s) for an alert.
+char BatteryGaugeLtc2943::getAlertReason (void)
 {
-    BatteryGaugeLtc2943::Alert alert = BatteryGaugeLtc2943::ALERT_NONE;
+    char result = 0;
+    char data[2];
     
-    // TODO complete
-
-    return alert;
+    if (gReady && (gpI2c != NULL)){
+        data[0] = 0x00;  // Address of the control register
+        data[1] = 0;
+        // Read the status register
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1))) {
+            result = data[1];
+        }
+    }
+    
+    return result;
 }
         
 //----------------------------------------------------------------
-// PUBLIC FUNCTIONS: setting/getting/clearing thresholds
+// PUBLIC FUNCTIONS: setting/getting/checking/clearing thresholds
 //----------------------------------------------------------------
 
 /// Set temperature alert upper threshold.
-bool setTemperatureHigh(int32_t temperatureC)
+bool BatteryGaugeLtc2943::setTemperatureHigh (int32_t temperatureC)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = temperatureCToRegister(temperatureC);
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x16; // Temperature threshold high address
+        // Only write the value if it fits (and taking into
+        // account the fact that 0xFF means "no upper threshold")
+        if (registerValue < 0xFF) {
+            data[1] = (char) registerValue;
+            if (gpI2c->write(0x16, &(data[0]), 2) == 0) {
+                success = true;
+            }
+        }        
+    }
 
     return success;
 }
 
-/// get temperature alert upper threshold.
-bool getTemperatureHigh(int32_t *pTemperatureC)
+/// Get temperature alert upper threshold.
+bool BatteryGaugeLtc2943::getTemperatureHigh (int32_t *pTemperatureC)
 {
     bool success = false;
-    
-    // TODO complete
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x16; // Temperature threshold high address
+        data[1] = 0;
+
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
+            success = true;
+            
+            if (pTemperatureC) {
+                *pTemperatureC = (int32_t) registerToTemperatureC((uint16_t) data[1]);
+            }
+        }
+    }
 
     return success;
+}
+
+/// Is the temperature alert upper threshold set.
+bool BatteryGaugeLtc2943::isTemperatureHighSet (void)
+{
+    bool isSet = false;
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x16; // Temperature threshold high address
+        data[1] = 0;
+
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {            
+            if (data[1] < 0xFF) {
+                isSet = true;
+            }
+        }
+    }
+
+    return isSet;
 }
 
 /// Clear temperature alert upper threshold.
-bool clearTemperatureHigh()
+bool BatteryGaugeLtc2943::clearTemperatureHigh (void)
 {
     bool success = false;
-    
-    // TODO complete
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x16;    // Temperature threshold high address
+        data[1] = 0xFF;    // 0xFF means no upper threshold set
+        if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
+            success = true;
+        }
+    }
 
     return success;
 }
 
 /// Set temperature alert lower threshold.
-bool setTemperatureLow(int32_t temperatureC)
+bool BatteryGaugeLtc2943::setTemperatureLow (int32_t temperatureC)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = temperatureCToRegister (temperatureC);
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x17; // Temperature threshold low address
+        // Only write the value if it fits (and taking into
+        // account the fact that 0 means "no lower threshold")
+        if (registerValue > 0) {
+            data[1] = (char) registerValue;
+            if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
+                success = true;
+            }
+        }        
+    }
 
     return success;
 }
 
-/// get temperature alert LOWER threshold.
-bool getTemperatureLow(int32_t *pTemperatureC)
+/// get temperature alert lower threshold.
+bool BatteryGaugeLtc2943::getTemperatureLow (int32_t *pTemperatureC)
 {
     bool success = false;
-    
-    // TODO complete
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x17; // Temperature threshold low address
+        data[1] = 0;
+
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
+            success = true;
+            
+            if (pTemperatureC) {
+                *pTemperatureC = registerToTemperatureC((uint16_t) data[1]);
+            }
+        }
+    }
 
     return success;
+}
+
+/// Is the temperature alert lower threshold set.
+bool BatteryGaugeLtc2943::isTemperatureLowSet (void)
+{
+    bool isSet = false;
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x17; // Temperature threshold low address
+        data[1] = 0;
+
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
+            
+            if (data[1] > 0) {
+                isSet = true;
+            }
+        }
+    }
+
+    return isSet;
 }
 
 /// Clear temperature alert lower threshold.
-bool clearTemperatureLow()
+bool BatteryGaugeLtc2943::clearTemperatureLow (void)
 {
     bool success = false;
-    
-    // TODO complete
+    char data[2];
+
+    // Note that the temperature threshold is 8 bit, not 16 bits
+    // like all the other thresholds
+    if (gReady && (gpI2c != NULL)) {
+        data[0] = 0x17; // Temperature threshold low address
+        data[1] = 0;    // 0 means no lower threshold set
+        
+        if (gpI2c->write(0x17, &(data[0]), 2) == 0) {
+            success = true;
+        }
+    }
 
     return success;
 }
 
 /// Set voltage alert upper threshold.
-bool setVoltageHigh(int32_t voltageMV)
+bool BatteryGaugeLtc2943::setVoltageHigh (int32_t voltageMV)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = voltageMVToRegister(voltageMV);
 
+    // Only write the value if it is less than 0xFFFF (as
+    // 0xFFFF means no threshold set)
+    if (registerValue < 0xFFFF) {
+        success = setTwoBytes (0x0A, registerValue);
+    }
+    
     return success;
 }
 
 /// Get voltage alert upper threshold.
-bool getVoltageHigh(int32_t *pVoltageMV)
+bool BatteryGaugeLtc2943::getVoltageHigh (int32_t *pVoltageMV)
 {
     bool success = false;
+    uint16_t data;
     
-    // TODO complete
+    success = getTwoBytes (0x0A, &data);
+    if (success && pVoltageMV) {
+        *pVoltageMV = registerToVoltageMV (data);
+    }
 
     return success;
+}
+
+/// Is the voltage alert upper threshold set.
+bool BatteryGaugeLtc2943::isVoltageHighSet (void)
+{
+    bool isSet = false;
+    uint16_t data;
+    
+    // Default value is 0xFFFF, so if it is not that it is set
+    if (getTwoBytes (0x0A, &data) && (data != 0xFFFF)) {
+        isSet = true;
+    }
+    
+    return isSet;
 }
 
 /// Clear voltage alert upper threshold.
-bool clearVoltageHigh()
+bool BatteryGaugeLtc2943::clearVoltageHigh (void)
 {
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
+    return setTwoBytes (0x0A, 0xFFFF);
 }
 
 /// Set voltage alert lower threshold.
-bool setVoltageLow(int32_t voltageMV)
+bool BatteryGaugeLtc2943::setVoltageLow (int32_t voltageMV)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = voltageMVToRegister (voltageMV);
 
+    // Only write the value if it is greater than 0 (as
+    // 0 means no threshold set)
+    if (registerValue > 0) {
+        success = setTwoBytes (0x0C, registerValue);
+    }
+    
     return success;
 }
 
 /// Get voltage alert lower threshold.
-bool getVoltageLow(int32_t *pVoltageMV)
+bool BatteryGaugeLtc2943::getVoltageLow (int32_t *pVoltageMV)
 {
     bool success = false;
+    uint16_t data;
     
-    // TODO complete
+    success = getTwoBytes (0x0C, &data);
+    if (success && pVoltageMV) {
+        *pVoltageMV = registerToVoltageMV (data);
+    }
 
     return success;
+}
+
+/// Is the voltage alert lower threshold set.
+bool BatteryGaugeLtc2943::isVoltageLowSet (void)
+{
+    bool isSet = false;
+    uint16_t data;
+    
+    // Default value is 0, so if it is not that it is set
+    if (getTwoBytes (0x0C, &data) && (data != 0)) {
+        isSet = true;
+    }
+    
+    return isSet;
 }
 
 /// Clear voltage alert lower threshold.
-bool clearVoltageLow()
+bool BatteryGaugeLtc2943::clearVoltageLow(void)
 {
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
+    return setTwoBytes (0x0C, 0);
 }
 
 /// Set current alert upper threshold.
-bool setCurrentHigh(int32_t currentMA)
+bool BatteryGaugeLtc2943::setCurrentHigh(int32_t currentMA)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
 
+    // Only write the value if it is less than 0xFFFF (as
+    // 0xFFFF means no threshold set)
+    if (registerValue < 0xFFFF) {
+        success = setTwoBytes (0x10, registerValue);
+    }
+    
     return success;
 }
 
 /// Get current alert upper threshold.
-bool getCurrentHigh(int32_t *pCurrentMA)
+bool BatteryGaugeLtc2943::getCurrentHigh(int32_t *pCurrentMA)
 {
     bool success = false;
+    uint16_t data;
     
-    // TODO complete
+    success = getTwoBytes (0x10, &data);
+    if (success && pCurrentMA) {
+        *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+    }
 
     return success;
+}
+
+/// Is the current alert upper threshold set.
+bool BatteryGaugeLtc2943::isCurrentHighSet(void)
+{
+    bool isSet = false;
+    uint16_t data;
+    
+    // Default value is 0xFFFF, so if it is not that it is set
+    if (getTwoBytes (0x10, &data) && (data != 0xFFFF)) {
+        isSet = true;
+    }
+    
+    return isSet;
 }
 
 /// Clear current alert upper threshold.
-bool clearCurrentHigh()
+bool BatteryGaugeLtc2943::clearCurrentHigh(void)
 {
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
+    return setTwoBytes (0x10, 0xFFFF);
 }
 
 /// Set current alert lower threshold.
-bool setCurrentLow(int32_t currentMA)
+bool BatteryGaugeLtc2943::setCurrentLow(int32_t currentMA)
 {
     bool success = false;
-    
-    // TODO complete
+    uint16_t registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
 
+    // Only write the value if it is greate than 0 (as
+    // 0 means no threshold set)
+    if (registerValue > 0) {
+        success = setTwoBytes (0x12, registerValue);
+    }
+    
     return success;
 }
 
 /// Get current alert lower threshold.
-bool getCurrentLow(int32_t *pCurrentMA)
+bool BatteryGaugeLtc2943::getCurrentLow(int32_t *pCurrentMA)
 {
     bool success = false;
+    uint16_t data;
     
-    // TODO complete
+    success = getTwoBytes (0x12, &data);
+    if (success && pCurrentMA) {
+        *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+    }
 
     return success;
+}
+
+/// Is the current alert lower threshold set.
+bool BatteryGaugeLtc2943::isCurrentLowSet(void)
+{
+    bool isSet = false;
+    uint16_t data;
+    
+    // Default value is 0, so if it is not that it is set
+    if (getTwoBytes (0x12, &data) && (data != 0)) {
+        isSet = true;
+    }
+    
+    return isSet;
 }
 
 /// Clear current alert lower threshold.
-bool clearCurrentLow()
+bool BatteryGaugeLtc2943::clearCurrentLow(void)
+{
+    return setTwoBytes (0x12, 0);
+}
+
+/// Set charge alert upper threshold.
+bool BatteryGaugeLtc2943::setChargeHigh(int32_t chargeMAH)
 {
     bool success = false;
+    uint16_t registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+
+    // Only write the value if it is less than 0xFFFF (as
+    // 0xFFFF means no threshold set)
+    if (registerValue < 0xFFFF) {
+        success = setTwoBytes (0x04, registerValue);
+    }
     
-    // TODO complete
+    return success;
+}
+
+/// Get charge alert upper threshold.
+bool BatteryGaugeLtc2943::getChargeHigh(int32_t *pChargeMAH)
+{
+    bool success = false;
+    uint16_t data;
+    
+    success = getTwoBytes (0x04, &data);
+    if (success && pChargeMAH) {
+        *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+    }
 
     return success;
 }
 
-/// Set capacity alert upper threshold.
-bool setCapacityHigh(int32_t capacityMAh)
+/// Is the charge alert upper threshold set.
+bool BatteryGaugeLtc2943::isChargeHighSet(void)
+{
+    bool isSet = false;
+    uint16_t data;
+    
+    // Default value is 0xFFFF, so if it is not that it is set
+    if (getTwoBytes (0x04, &data) && (data != 0xFFFF)) {
+        isSet = true;
+    }
+    
+    return isSet;
+}
+
+/// Clear charge alert upper threshold.
+bool BatteryGaugeLtc2943::clearChargeHigh(void)
+{
+    return setTwoBytes (0x04, 0xFFFF);
+}
+
+/// Set charge alert lower threshold.
+bool BatteryGaugeLtc2943::setChargeLow(int32_t chargeMAH)
 {
     bool success = false;
+    uint16_t registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+
+    // Only write the value if it is greater than 0 (as
+    // 0 means no threshold set)
+    if (registerValue > 0) {
+        success = setTwoBytes (0x06, registerValue);
+    }
     
-    // TODO complete
+    return success;
+}
+
+/// Get charge alert lower threshold.
+bool BatteryGaugeLtc2943::getChargeLow(int32_t *pChargeMAH)
+{
+    bool success = false;
+    uint16_t data;
+    
+    success = getTwoBytes (0x06, &data);
+    if (success && pChargeMAH) {
+        *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+    }
 
     return success;
 }
 
-/// Get capacity alert upper threshold.
-bool getCapacityHigh(int32_t *pCapacityMAh)
+/// Is the charge alert lower threshold set.
+bool BatteryGaugeLtc2943::isChargeLowSet(void)
 {
-    bool success = false;
+    bool isSet = false;
+    uint16_t data;
     
-    // TODO complete
-
-    return success;
+    // Default value is 0, so if it is not that it is set
+    if (getTwoBytes (0x06, &data) && (data != 0)) {
+        isSet = true;
+    }
+    
+    return isSet;
 }
 
-/// Clear capacity alert upper threshold.
-bool clearCapacityHigh()
+/// Clear charge alert lower threshold.
+bool BatteryGaugeLtc2943::clearChargeLow(void)
 {
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
-}
-
-/// Set capacity alert lower threshold.
-bool setCapacityLow(int32_t capacityMAh)
-{
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
-}
-
-/// Get capacity alert lower threshold.
-bool getCapacityLow(int32_t *pCapacityMAh)
-{
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
-}
-
-/// Clear capacity alert lower threshold.
-bool clearCapacityLow()
-{
-    bool success = false;
-    
-    // TODO complete
-
-    return success;
+    return setTwoBytes (0x06, 0);
 }
 
 // End Of File
+

@@ -71,9 +71,9 @@ public:
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;
-    // The address of the device.
+    /// The address of the device.
     uint8_t gAddress;
-    // Flag to indicate device is ready
+    /// Flag to indicate device is ready
     bool gReady;
 
     /// Compute the checksum of a block of memory in the chip.

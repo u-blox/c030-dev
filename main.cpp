@@ -24,8 +24,6 @@
  * main() for testing C030 stuff.
  */
 
-// Required for UTM board
-static DigitalOut i2CPullUpBar(P1_1, 0);
 // Pin-out
 #define PIN_I2C_SDA  P0_27
 #define PIN_I2C_SCL  P0_28
@@ -36,6 +34,8 @@ static DigitalOut i2CPullUpBar(P1_1, 0);
 /// Default RSense (in mOhm) for BQ27441 battery gauge
 #define BQ27441_RSENSE_MOHM 10
 
+// Required for UTM board
+static DigitalOut i2CPullUpBar(P1_1, 0);
  
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN

@@ -48,16 +48,16 @@ public:
     } Alcc;
 
     /// The alerts that ALCC can give when in "AL" mode.
+    // The values form a bit-map.
     typedef enum {
-        ALERT_NONE,
-        ALERT_UNDERVOLTAGE_LOCKOUT,
-        ALERT_TEMPERATURE,
-        ALERT_VOLTAGE,
-        ALERT_CURRENT,
-        ALERT_CHARGE_LOW,
-        ALERT_CHARGE_HIGH,
-        ALERT_CHARGE_OVER_UNDER_FLOW,
-        MAX_NUM_ALERTS
+        ALERT_NONE = 0,
+        ALERT_UNDERVOLTAGE_LOCKOUT = 1 << 0,
+        ALERT_VOLTAGE = 1 << 1,
+        ALERT_CHARGE_LOW = 1 << 2,
+        ALERT_CHARGE_HIGH = 1 << 3,
+        ALERT_TEMPERATURE = 1 << 4,
+        ALERT_CHARGE_OVER_UNDER_FLOW = 1 << 5,
+        ALERT_CURRENT = 1 << 6
     } Alert;
 
     /// Constructor.
@@ -110,167 +110,211 @@ public:
 
     /// Tell the LTC2943 chip that charging is complete,
     // after which it can work out the remaining charge.
+    // \param capacityMAH the capacity of the charged battery.
     // \return true if successful, otherwise false.
-    bool setChargingComplete ();
+    bool setChargingComplete (int32_t capacityMAH);
         
     /// Read the remaining available battery energy.
-    // NOTE: this function can only return an accurate value
-    // if the battery has been fully charged and the setChargingComplete()
+    // NOTE: this function can only return a value if the battery
+    // has been fully charged and the setChargingComplete()
     // function called since the LTC2943 chip was last physically reset.
-    // If this is not the case the pCapacityMAh value will be filled in
-    // from the data available but the return value will be set to false.
-    // \param pCapacityMAh place to put the capacity reading.
+    // If this is not the case the pChargeMAh value will be filled in
+    // with the charge used instead and the return value will be set to
+    // false.
+    // \param pChargeMAH place to put the charge reading.
     // \return true if successful, otherwise false.
-    bool getRemainingCapacity (int32_t *pCapacityMAh);
+    bool getRemainingCharge (int32_t *pChargeMAH);
 
     /// Read the state of charge of the battery as a percentage.
     // NOTE: this function can only return an accurate value
     // if the battery has been fully charged and the setChargingComplete()
     // function called since the LTC2943 chip was last physically reset.
-    // If this is not the case the pBatteryPercent value will be filled in
-    // from the data available but the return value will be set to false.
     // \param pBatteryPercent place to put the reading.
     // \return true if successful, otherwise false.
     bool getRemainingPercentage (int32_t *pBatteryPercent);
     
-    /// Get the reason for an alert.
-    // \return the Alert reason.
-    Alert getAlertReason ();
+    /// Get the reason(s) for an alert.
+    // \return a bit-map containing the Alert reasons that
+    //         can be tested against the values of the Alert enum.
+    char getAlertReason (void);
         
     /// Set temperature alert upper threshold.
     // \param temperatureC the value to set.
-    // \return true if successful, otherwise false.
-    bool setTemperatureHigh(int32_t temperatureC);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setTemperatureHigh (int32_t temperatureC);
 
     /// Get temperature alert upper threshold.
     // \param pTemperatureC place to put the temperature threshold.
     // \return true if successful, otherwise false.
-    bool getTemperatureHigh(int32_t *pTemperatureC);
+    bool getTemperatureHigh (int32_t *pTemperatureC);
 
+    /// Determine whether the temperature high threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isTemperatureHighSet (void);
+    
     /// Clear temperature alert upper threshold.
     // \return true if successful, otherwise false.
-    bool clearTemperatureHigh();
+    bool clearTemperatureHigh (void);
 
     /// Set temperature alert lower threshold.
     // \param temperatureC the value to set.
-    // \return true if successful, otherwise false.
-    bool setTemperatureLow(int32_t temperatureC);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setTemperatureLow (int32_t temperatureC);
     
     /// Get temperature alert lower threshold.
     // \param pTemperatureC place to put the temperature threshold.
     // \return true if successful, otherwise false.
-    bool getTemperatureLow(int32_t *pTemperatureC);
+    bool getTemperatureLow (int32_t *pTemperatureC);
 
+    /// Determine whether the temperature low threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isTemperatureLowSet (void);
+    
     /// Clear temperature alert lower threshold.
     // \return true if successful, otherwise false.
-    bool clearTemperatureLow();
+    bool clearTemperatureLow (void);
 
     /// Set voltage alert upper threshold.
     // \param voltageMV the value to set.
-    // \return true if successful, otherwise false.
-    bool setVoltageHigh(int32_t voltageMV);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setVoltageHigh (int32_t voltageMV);
     
     /// Get voltage alert upper threshold.
     // \param pVoltageMV place to put the voltage threshold.
     // \return true if successful, otherwise false.
-    bool getVoltageHigh(int32_t *pVoltageMV);
+    bool getVoltageHigh (int32_t *pVoltageMV);
 
+    /// Determine whether the voltage high threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isVoltageHighSet (void);
+    
     /// Clear voltage alert upper threshold.
     // \return true if successful, otherwise false.
-    bool clearVoltageHigh();
+    bool clearVoltageHigh (void);
 
     /// Set voltage alert lower threshold.
     // \param voltageMV the value to set.
-    // \return true if successful, otherwise false.
-    bool setVoltageLow(int32_t voltageMV);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setVoltageLow (int32_t voltageMV);
     
     /// Get voltage alert lower threshold.
     // \param pVoltageMV place to put the voltage threshold.
     // \return true if successful, otherwise false.
-    bool getVoltageLow(int32_t *pVoltageMV);
+    bool getVoltageLow (int32_t *pVoltageMV);
 
+    /// Determine whether the voltage low threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isVoltageLowSet (void);
+    
     /// Clear voltage alert lower threshold.
     // \return true if successful, otherwise false.
-    bool clearVoltageLow();
+    bool clearVoltageLow (void);
 
     /// Set current alert upper threshold.
     // \param currentMA the value to set.
-    // \return true if successful, otherwise false.
-    bool setCurrentHigh(int32_t currentMA);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setCurrentHigh (int32_t currentMA);
 
     /// Get current alert upper threshold.
     // \param pCurrentMA place to put the current threshold.
     // \return true if successful, otherwise false.
-    bool getCurrentHigh(int32_t *pCurrentMA);
+    bool getCurrentHigh (int32_t *pCurrentMA);
+    
+    /// Determine whether the current high threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isCurrentHighSet (void);
     
     /// Clear current alert upper threshold.
     // \return true if successful, otherwise false.
-    bool clearCurrentHigh();
+    bool clearCurrentHigh (void);
 
     /// Set current alert lower threshold.
     // \param currentMA the value to set.
-    // \return true if successful, otherwise false.
-    bool setCurrentLow(int32_t currentMA);
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setCurrentLow (int32_t currentMA);
     
     /// Get current alert lower threshold.
     // \param pCurrentMA place to put the current threshold.
     // \return true if successful, otherwise false.
-    bool getCurrentLow(int32_t *pCurrentMA);
+    bool getCurrentLow (int32_t *pCurrentMA);
+    
+    /// Determine whether the current low threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isCurrentLowSet (void);
     
     /// Clear current alert lower threshold.
     // \return true if successful, otherwise false.
-    bool clearCurrentLow();
+    bool clearCurrentLow (void);
 
     /// Set capacity alert upper threshold.
-    // \param capacityMAh the value to set.
-    // \return true if successful, otherwise false.
-    bool setCapacityHigh(int32_t capacityMAh);
+    // \param chargeMAH the value to set.
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setChargeHigh (int32_t chargeMAH);
 
     /// Get capacity alert upper threshold.
-    // \param pCapacityMAh place to put the capacity threshold.
+    // \param pChargeMAh place to put the capacity threshold.
     // \return true if successful, otherwise false.
-    bool getCapacityHigh(int32_t *pCapacityMAh);
+    bool getChargeHigh (int32_t *pChargeMAH);
 
+    /// Determine whether the charge high threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isChargeHighSet (void);
+    
     /// Clear capacity alert upper threshold.
     // \return true if successful, otherwise false.
-    bool clearCapacityHigh();
+    bool clearChargeHigh (void);
 
     /// Set capacity alert lower threshold.
-    // \param capacityMAh the value to set.
-    // \return true if successful, otherwise false.
-    bool setCapacityLow(int32_t capacityMAh);
+    // \param chargeMAH the value to set.
+    // \return true if successful, otherwise false.  Trying
+    //         to set an out of range value will return false.
+    bool setChargeLow (int32_t chargeMAH);
     
     /// Get capacity alert lower threshold.
-    // \param pCapacityMAh place to put the capacity threshold.
+    // \param pChargeMAH place to put the capacity threshold.
     // \return true if successful, otherwise false.
-    bool getCapacityLow(int32_t *pCapacityMAh);
+    bool getChargeLow (int32_t *pChargeMAH);
 
+    /// Determine whether the charge low threshold is set or not.
+    // \return true if it is set otherwise false.
+    bool isChargeLowSet (void);
+    
     /// Clear capacity alert lower threshold.
     // \return true if successful, otherwise false.
-    bool clearCapacityLow();
+    bool clearChargeLow (void);
 
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;
-    // Value of RSense.
+    /// Value of RSense.
     int32_t gRSenseMOhm;
-    // The address of the device.
+    /// Value of Prescaler.
+    int32_t gPrescaler;
+    /// The address of the device.
     uint8_t gAddress;
-    // Flag to indicate device is ready.
+    /// Flag to indicate device is ready.
     bool gReady;
-    // The charge (this value will take into account
-    // wraps) of the accumulated charge register.
-    int32_t gCharge;
-    // Flag to indicate that we are aware of the fully
-    // charged battery state and hence can report
-    // the remaining charge.
-    bool gRemainingChargeKnown;
+    /// The capacity of the battery.
+    int32_t gBatteryCapacityMAH;
 
     /// Read two bytes starting at a given address.
     // \param registerAddress the register address to start reading from.
     // \param pBytes place to put the two bytes.
     // \return true if successful, otherwise false.
     bool getTwoBytes (uint8_t registerAddress, uint16_t *pBytes);
+    
+    /// Set two bytes, starting at a given address.
+    // \param registerAddress the register address to start reading from.
+    // \param bytes the two bytes.
+    // \return true if successful, otherwise false.
+    bool setTwoBytes (uint8_t registerAddress, uint16_t bytes);
     
     /// Make sure that an ADC reading has been performed recently.
     // \return true if successful, otherwise false.
@@ -281,16 +325,46 @@ protected:
     // \return the temperature reading in C.
     int32_t registerToTemperatureC (uint16_t data);
 
+    /// Convert a temperature in C to a register value.
+    // \param temperatureC the temperature in C.
+    // \return the register value.
+    uint16_t temperatureCToRegister (int32_t temperatureC);
+
     /// Convert a 16 bit register reading into a voltage reading in mV
     // \param data the register reading.
     // \return the voltage reading in mV.
     int32_t registerToVoltageMV (uint16_t data);
-
+    
+    /// Convert a voltage in mV to a register value.
+    // \param voltageMV the voltage in mV.
+    // \return  the register value.
+    uint16_t voltageMVToRegister (int32_t voltageMV);
+    
     /// Convert a 16 bit register reading into a current reading in mA
     // \param data the register reading.
     // \param rSenseMOhm the rSense value.
     // \return the current reading in mA.
     int32_t registerToCurrentMA (uint16_t data, int32_t rSenseMOhm);
+    
+    /// Convert a current in mA to a register value.
+    // \param currentMA the current in mA.
+    // \param rSenseMOhm the rSense value.
+    // \return  the register value.
+    uint16_t currentMAToRegister (int32_t currentMA, int32_t rSenseMOhm);
+
+    /// Convert a 16 bit register reading into a charge reading in mAh
+    // \param data the register reading.
+    // \param rSenseMOhm the rSense value.
+    // \param prescaler the prescaler value.
+    // \return the charge reading in mAh.
+    int32_t registerToChargeMAH (uint16_t data, int32_t rSenseMOhm, int32_t prescaler);
+
+    /// Convert a charge in mAh to a register value.
+    // \param currentMAH the current in mAh.
+    // \param rSenseMOhm the rSense value.
+    // \param prescaler the prescaler value.
+    // \return the register value.
+    uint16_t chargeMAHToRegister (int32_t currentMAH, int32_t rSenseMOhm, int32_t prescaler);
 };
 
 #endif

@@ -20,7 +20,7 @@
  */
 
 // Define this to print debug information
-#define DEBUG_LTC2943
+//#define DEBUG_LTC2943
 
 #include <mbed.h>
 #include <battery_gauge_ltc2943.h>
@@ -36,6 +36,12 @@
 // How long to wait for one ADC read of temperature, voltage and current
 // to be performed
 #define ADC_READ_WAIT_MS 100
+
+// The tolerance allowed for value conversions into the threshold registers
+#define LTC_2943_TOLERANCE 2
+
+// Check that a value is within tolerance
+#define TOLERANCE_CHECK(value, intendedValue, tolerance) ((value - intendedValue <=  tolerance) && (value - intendedValue >=  -tolerance))
 
 // ----------------------------------------------------------------
 // PRIVATE VARIABLES
@@ -133,21 +139,24 @@ bool BatteryGaugeLtc2943::makeAdcReading (void)
 int32_t BatteryGaugeLtc2943::registerToTemperatureC (uint16_t data)
 {
     // From the data sheet the temperature (in Kelvin) is
-    // T = 510 * data / 0xFFFF    
-    return (((uint32_t) data * 510) >> 16) - 273;
+    // T = 510 * data / 0xffff    
+    return (((uint32_t) data) * 510 / 0xffff) - 273;
 }
 
 /// Convert a temperature in C to a register value.
+// Note: no overflow checking is done here, such effects must be checked by the caller.
 uint16_t BatteryGaugeLtc2943::temperatureCToRegister (int32_t temperatureC)
 {
     int32_t registerValue;
     
-    // Rearranging from the above 
-    // register = T(Kelvin) * 0xFFFF / 510
-    registerValue = ((temperatureC << 16) / 510) + 273;
+    // Check against the laws of physics
+    MBED_ASSERT (temperatureC >= -273);
     
-    if (registerValue > 0xFFFF) {
-        registerValue = 0xFFFF;
+    // Rearranging from the above 
+    registerValue = (temperatureC + 273) * 0xffff / 510;
+    
+    if (registerValue > 0xffff) {
+        registerValue = 0xffff;
     }
     if (registerValue < 0) {
         registerValue = 0;
@@ -160,21 +169,21 @@ uint16_t BatteryGaugeLtc2943::temperatureCToRegister (int32_t temperatureC)
 int32_t BatteryGaugeLtc2943::registerToVoltageMV (uint16_t data)
 {
     // From the data sheet the voltage (in mV) is
-    // V = 23600 * data / 0xFFFF
-    return (((int32_t) data) * 23600) >> 16;
+    // V = 23600 * data / 0xffff
+    return (((int32_t) data) * 23600) / 0xffff;
 }
 
 /// Convert a voltage in mV to a register value.
+// Note: no overflow checking is done here, such effects must be checked by the caller.
 uint16_t BatteryGaugeLtc2943::voltageMVToRegister (int32_t voltageMV)
 {
     int32_t registerValue;
     
     // Rearranging from the above 
-    // register = V * 0xFFFF / 23600
-    registerValue = (voltageMV << 16) / 23600;
+    registerValue = (voltageMV * 0xffff) / 23600;
     
-    if (registerValue > 0xFFFF) {
-        registerValue = 0xFFFF;
+    if (registerValue > 0xffff) {
+        registerValue = 0xffff;
     }
     if (registerValue < 0) {
         registerValue = 0;
@@ -186,23 +195,24 @@ uint16_t BatteryGaugeLtc2943::voltageMVToRegister (int32_t voltageMV)
 /// Convert a 16 bit register reading into a current reading in mA.
 int32_t BatteryGaugeLtc2943::registerToCurrentMA (uint16_t data, int32_t rSenseMOhm)
 {
-    // From the data sheet, max current corresponds to 0xFFFF
+    // From the data sheet, max current (in Amps) corresponds to 0xffff
     // (which is 60 mV across RSense) while min (most negative)
     // current corresponds to 0 (which is -60 mV across RSense).
-    return (((int32_t) (data - 0x7FFF)) * 60 >> 15) / rSenseMOhm;
+    return ((int32_t) (data - 0x7fff)) * 60 * 1000 / 0x7fff / rSenseMOhm;
 }
 
 /// Convert a current in mA to a register value.
+// Note: no overflow checking is done here, such effects must be checked by the caller.
 uint16_t BatteryGaugeLtc2943::currentMAToRegister (int32_t currentMA, int32_t rSenseMOhm)
 {
     int32_t registerValue;
+    int32_t value = currentMA * rSenseMOhm;
     
     // Rearranging from the above 
-    // register = ((current * rSenseMOhm) << 15) / 60 + 0x7FFF
-    registerValue = (((currentMA * rSenseMOhm) << 15) / 60) + 0x7FFF;
+    registerValue = ((value) * 544 / 1000) + 0x7fff;
     
-    if (registerValue > 0xFFFF) {
-        registerValue = 0xFFFF;
+    if (registerValue > 0xffff) {
+        registerValue = 0xffff;
     }
     if (registerValue < 0) {
         registerValue = 0;
@@ -221,16 +231,16 @@ int32_t BatteryGaugeLtc2943::registerToChargeMAH (uint16_t data, int32_t rSenseM
 }
 
 /// Convert a charge in mAh to a register value.
+// Note: no overflow checking is done here, such effects must be checked by the caller.
 uint16_t BatteryGaugeLtc2943::chargeMAHToRegister (int32_t chargeMAH, int32_t rSenseMOhm, int32_t prescaler)
 {
     int32_t registerValue;
     
     // Rearranging from the above 
-    // register = ((chargeMAH << 12) * rSenseMOhm) / prescaler / 17
     registerValue = ((chargeMAH << 12) * rSenseMOhm) / prescaler / 17;
     
-    if (registerValue > 0xFFFF) {
-        registerValue = 0xFFFF;
+    if (registerValue > 0xffff) {
+        registerValue = 0xffff;
     }
     if (registerValue < 0) {
         registerValue = 0;
@@ -342,7 +352,7 @@ bool BatteryGaugeLtc2943::setMonitor (bool onNotOff, bool isSlow)
                 // Set the ADC mode in bits 6 and 7 to 11 or, if
                 // isSlow is true, to 10 (in which case a measurement
                 // is only performed every ten seconds).
-                data[1] |= 0xC0;
+                data[1] |= 0xc0;
                 if (isSlow) {
                     data[1] &= ~0x40;
                 }
@@ -350,7 +360,7 @@ bool BatteryGaugeLtc2943::setMonitor (bool onNotOff, bool isSlow)
                 data[1] &= ~0x01;
             } else {
                 // Set the ADC mode to 00 and the power down bit to 1
-                data[1] &= ~0xC0;
+                data[1] &= ~0xc0;
                 data[1] |= 0x01;
             }
             
@@ -432,13 +442,12 @@ bool BatteryGaugeLtc2943::getCurrent (int32_t *pCurrentMA)
     if (gReady && (gpI2c != NULL)){
         if (makeAdcReading()) {
             // Read from the current register address
-            if (getTwoBytes (0x0E, &data)) {
+            if (getTwoBytes (0x0e, &data)) {
                 success = true;
 
                 if (pCurrentMA) {
                     *pCurrentMA = registerToCurrentMA (data, gRSenseMOhm);
                 }
-
 #ifdef DEBUG_LTC2943
                 printf("BatteryGaugeLtc2943 (I2C 0x%02x): current registers report 0x%04x, giving a current of %.3f A.\n",
                        gAddress >> 1, data, (float) registerToCurrentMA (data, gRSenseMOhm) / 1000);
@@ -478,11 +487,11 @@ bool BatteryGaugeLtc2943::setChargingComplete (int32_t capacityMAH)
                 gBatteryCapacityMAH = capacityMAH;
                 
                 // Set the charge counter to max
-                success = setTwoBytes(0x02, 0xFFFF);
+                success = setTwoBytes(0x02, 0xffff);
     
                 // If the ADC mode, in bits 6 and 7, is not zero then
                 // we must switch on the analogue power again.
-                if ((data[1] & 0xC0) != 0) {
+                if ((data[1] & 0xc0) != 0) {
                     data[1] &= ~0x01;
                     if (gpI2c->write(gAddress, &(data[0]), 2) != 0) {
                         success = false;
@@ -508,8 +517,8 @@ bool BatteryGaugeLtc2943::getRemainingCharge (int32_t *pChargeMAH)
             success = true;
             
             // Full scale corresponds to the capacity of the battery when
-            // fully charged, so the capacity used is 0xFFFF - data            
-            chargeMAH = registerToChargeMAH (0xFFFF - data, gRSenseMOhm, gPrescaler);
+            // fully charged, so the capacity used is 0xffff - data            
+            chargeMAH = registerToChargeMAH (0xffff - data, gRSenseMOhm, gPrescaler);
             
             if (pChargeMAH) {
                 *pChargeMAH = gBatteryCapacityMAH - chargeMAH;
@@ -586,20 +595,35 @@ bool BatteryGaugeLtc2943::setTemperatureHigh (int32_t temperatureC)
     uint16_t registerValue = temperatureCToRegister(temperatureC);
     char data[2];
 
-    // Note that the temperature threshold is 8 bit, not 16 bits
-    // like all the other thresholds
     if (gReady && (gpI2c != NULL)) {
-        data[0] = 0x16; // Temperature threshold high address
-        // Only write the value if it fits (and taking into
-        // account the fact that 0xFF means "no upper threshold")
-        if (registerValue < 0xFF) {
-            data[1] = (char) registerValue;
-            if (gpI2c->write(0x16, &(data[0]), 2) == 0) {
-                success = true;
+        // Note that the temperature threshold is 8 bit, not 16 bits
+        // like all the other thresholds
+        registerValue >>= 8;
+        // Check for overflow in conversion to the register value
+        printf ("registerValue %d, temperatureC %d, registerToTemperatureC(registerValue << 8) %d\n",
+                registerValue, temperatureC, registerToTemperatureC(registerValue << 8));
+        if (TOLERANCE_CHECK (registerToTemperatureC(registerValue << 8), temperatureC, LTC_2943_TOLERANCE)) {
+            data[0] = 0x16; // Temperature threshold high address
+            // Only write the value if it fits (and taking into
+            // account the fact that 0xFF means "no upper threshold")
+            if ((registerValue < 0xff)) {
+                data[1] = (char) registerValue;
+                if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
+                    success = true;
+#ifdef DEBUG_LTC2943
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature high threshold register set to 0x%02x, (%d C).\n",
+                           gAddress >> 1, (char) registerValue, registerToTemperatureC(registerValue << 8));
+#endif
+                }
+            } else {
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): trying to set temperature high threshold to %d C, value is too large (0x%04x < 0xff).\n",
+                       gAddress >> 1, temperatureC, registerValue);
+#endif
             }
-        }        
+        }
     }
-
+    
     return success;
 }
 
@@ -609,8 +633,6 @@ bool BatteryGaugeLtc2943::getTemperatureHigh (int32_t *pTemperatureC)
     bool success = false;
     char data[2];
 
-    // Note that the temperature threshold is 8 bit, not 16 bits
-    // like all the other thresholds
     if (gReady && (gpI2c != NULL)) {
         data[0] = 0x16; // Temperature threshold high address
         data[1] = 0;
@@ -620,7 +642,13 @@ bool BatteryGaugeLtc2943::getTemperatureHigh (int32_t *pTemperatureC)
             success = true;
             
             if (pTemperatureC) {
-                *pTemperatureC = (int32_t) registerToTemperatureC((uint16_t) data[1]);
+                // Note that the temperature threshold is 8 bit, not 16 bits
+                // like all the other thresholds
+                *pTemperatureC = registerToTemperatureC(((uint16_t) data[1]) << 8);
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature high threshold register reports 0x%02x (a temperature of %d C).\n",
+                       gAddress >> 1, ((uint16_t) data[1]) << 8, registerToTemperatureC(((uint16_t) data[1]) << 8));
+#endif
             }
         }
     }
@@ -642,8 +670,11 @@ bool BatteryGaugeLtc2943::isTemperatureHighSet (void)
 
         if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
             (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {            
-            if (data[1] < 0xFF) {
+            if (data[1] < 0xff) {
                 isSet = true;
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature high threshold register is set.\n", gAddress >> 1);
+#endif
             }
         }
     }
@@ -661,9 +692,12 @@ bool BatteryGaugeLtc2943::clearTemperatureHigh (void)
     // like all the other thresholds
     if (gReady && (gpI2c != NULL)) {
         data[0] = 0x16;    // Temperature threshold high address
-        data[1] = 0xFF;    // 0xFF means no upper threshold set
+        data[1] = 0xff;    // 0xFF means no upper threshold set
         if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
             success = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature high threshold register cleared.\n", gAddress >> 1);
+#endif
         }
     }
 
@@ -677,18 +711,31 @@ bool BatteryGaugeLtc2943::setTemperatureLow (int32_t temperatureC)
     uint16_t registerValue = temperatureCToRegister (temperatureC);
     char data[2];
 
-    // Note that the temperature threshold is 8 bit, not 16 bits
-    // like all the other thresholds
     if (gReady && (gpI2c != NULL)) {
-        data[0] = 0x17; // Temperature threshold low address
-        // Only write the value if it fits (and taking into
-        // account the fact that 0 means "no lower threshold")
-        if (registerValue > 0) {
-            data[1] = (char) registerValue;
-            if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
-                success = true;
+        // Note that the temperature threshold is 8 bit, not 16 bits
+        // like all the other thresholds
+        registerValue >>= 8;
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToTemperatureC(registerValue << 8), temperatureC, LTC_2943_TOLERANCE)) {
+            data[0] = 0x17; // Temperature threshold low address
+            // Only write the value if it fits (and taking into
+            // account the fact that 0 means "no lower threshold")
+            if (registerValue > 0) {
+                data[1] = (char) registerValue;
+                if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
+                    success = true;
+#ifdef DEBUG_LTC2943
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature low threshold register set to 0x%02x, (%d C).\n",
+                        gAddress >> 1, (char) registerValue, registerToTemperatureC(registerValue << 8));
+#endif
+                }
+            } else {
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): trying to set temperature low threshold to %d C, value is too small (0x%04x > 0).\n",
+                       gAddress >> 1, temperatureC, registerValue);
+#endif
             }
-        }        
+        }
     }
 
     return success;
@@ -700,8 +747,6 @@ bool BatteryGaugeLtc2943::getTemperatureLow (int32_t *pTemperatureC)
     bool success = false;
     char data[2];
 
-    // Note that the temperature threshold is 8 bit, not 16 bits
-    // like all the other thresholds
     if (gReady && (gpI2c != NULL)) {
         data[0] = 0x17; // Temperature threshold low address
         data[1] = 0;
@@ -711,7 +756,13 @@ bool BatteryGaugeLtc2943::getTemperatureLow (int32_t *pTemperatureC)
             success = true;
             
             if (pTemperatureC) {
-                *pTemperatureC = registerToTemperatureC((uint16_t) data[1]);
+                // Note that the temperature threshold is 8 bit, not 16 bits
+                // like all the other thresholds
+                *pTemperatureC = registerToTemperatureC(((uint16_t) data[1]) << 8);
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature low threshold register reports 0x%02x (a temperature of %d C).\n",
+                       gAddress >> 1, ((uint16_t) data[1]) << 8, registerToTemperatureC(((uint16_t) data[1]) << 8));
+#endif
             }
         }
     }
@@ -736,6 +787,9 @@ bool BatteryGaugeLtc2943::isTemperatureLowSet (void)
             
             if (data[1] > 0) {
                 isSet = true;
+#ifdef DEBUG_LTC2943
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature low threshold register is set.\n", gAddress >> 1);
+#endif
             }
         }
     }
@@ -755,8 +809,11 @@ bool BatteryGaugeLtc2943::clearTemperatureLow (void)
         data[0] = 0x17; // Temperature threshold low address
         data[1] = 0;    // 0 means no lower threshold set
         
-        if (gpI2c->write(0x17, &(data[0]), 2) == 0) {
+        if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
             success = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): temperature low threshold register is cleared.\n", gAddress >> 1);
+#endif
         }
     }
 
@@ -769,12 +826,23 @@ bool BatteryGaugeLtc2943::setVoltageHigh (int32_t voltageMV)
     bool success = false;
     uint16_t registerValue = voltageMVToRegister(voltageMV);
 
-    // Only write the value if it is less than 0xFFFF (as
-    // 0xFFFF means no threshold set)
-    if (registerValue < 0xFFFF) {
-        success = setTwoBytes (0x0A, registerValue);
+    if (gReady) {
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToVoltageMV(registerValue), voltageMV, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is less than 0xffff (as
+            // 0xffff means no threshold set)
+            if (registerValue < 0xfff) {
+                success = setTwoBytes (0x0a, registerValue);
+#ifdef DEBUG_LTC2943
+                if (success) {
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage high threshold register set to 0x%04x, (%d mV).\n",
+                           gAddress >> 1, registerValue, registerToVoltageMV(registerValue));
+                }
+#endif
+            }
+        }
     }
-    
+
     return success;
 }
 
@@ -784,9 +852,15 @@ bool BatteryGaugeLtc2943::getVoltageHigh (int32_t *pVoltageMV)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x0A, &data);
-    if (success && pVoltageMV) {
-        *pVoltageMV = registerToVoltageMV (data);
+    if (gReady) {
+        success = getTwoBytes (0x0a, &data);
+        if (success && pVoltageMV) {
+            *pVoltageMV = registerToVoltageMV (data);
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage high threshold register is 0x%04x, (%d mV).\n",
+                   gAddress >> 1, data, registerToVoltageMV(data));
+#endif
+        }
     }
 
     return success;
@@ -798,9 +872,14 @@ bool BatteryGaugeLtc2943::isVoltageHighSet (void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0xFFFF, so if it is not that it is set
-    if (getTwoBytes (0x0A, &data) && (data != 0xFFFF)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0xffff, so if it is not that it is set
+        if (getTwoBytes (0x0a, &data) && (data != 0xffff)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage high threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -809,7 +888,16 @@ bool BatteryGaugeLtc2943::isVoltageHighSet (void)
 /// Clear voltage alert upper threshold.
 bool BatteryGaugeLtc2943::clearVoltageHigh (void)
 {
-    return setTwoBytes (0x0A, 0xFFFF);
+    bool success = false;
+    
+    if (gReady) {
+        success = setTwoBytes (0x0a, 0xffff);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage high threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+
+    return success;
 }
 
 /// Set voltage alert lower threshold.
@@ -818,10 +906,21 @@ bool BatteryGaugeLtc2943::setVoltageLow (int32_t voltageMV)
     bool success = false;
     uint16_t registerValue = voltageMVToRegister (voltageMV);
 
-    // Only write the value if it is greater than 0 (as
-    // 0 means no threshold set)
-    if (registerValue > 0) {
-        success = setTwoBytes (0x0C, registerValue);
+    if (gReady) {
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToVoltageMV(registerValue), voltageMV, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is greater than 0 (as
+            // 0 means no threshold set)
+            if (registerValue > 0) {
+                success = setTwoBytes (0x0c, registerValue);
+#ifdef DEBUG_LTC2943
+            if (success) {
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage low threshold register set to 0x%04x, (%d mV).\n",
+                       gAddress >> 1, registerValue, registerToVoltageMV(registerValue));
+            }
+#endif
+            }
+        }
     }
     
     return success;
@@ -833,11 +932,17 @@ bool BatteryGaugeLtc2943::getVoltageLow (int32_t *pVoltageMV)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x0C, &data);
-    if (success && pVoltageMV) {
-        *pVoltageMV = registerToVoltageMV (data);
+    if (gReady) {
+        success = getTwoBytes (0x0c, &data);
+        if (success && pVoltageMV) {
+            *pVoltageMV = registerToVoltageMV (data);
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage low threshold register is 0x%04x, (%d mV).\n",
+                   gAddress >> 1, data, registerToVoltageMV(data));
+#endif
+        }
     }
-
+    
     return success;
 }
 
@@ -847,9 +952,14 @@ bool BatteryGaugeLtc2943::isVoltageLowSet (void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0, so if it is not that it is set
-    if (getTwoBytes (0x0C, &data) && (data != 0)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0, so if it is not that it is set
+        if (getTwoBytes (0x0c, &data) && (data != 0)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage low threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -858,19 +968,40 @@ bool BatteryGaugeLtc2943::isVoltageLowSet (void)
 /// Clear voltage alert lower threshold.
 bool BatteryGaugeLtc2943::clearVoltageLow(void)
 {
-    return setTwoBytes (0x0C, 0);
+    bool success = false;
+    
+    if (gReady) {
+        success = setTwoBytes (0x0c, 0);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): voltage low threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+    
+    return success;
 }
 
 /// Set current alert upper threshold.
 bool BatteryGaugeLtc2943::setCurrentHigh(int32_t currentMA)
 {
     bool success = false;
-    uint16_t registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
+    uint16_t registerValue;
 
-    // Only write the value if it is less than 0xFFFF (as
-    // 0xFFFF means no threshold set)
-    if (registerValue < 0xFFFF) {
-        success = setTwoBytes (0x10, registerValue);
+    if (gReady) {
+        registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToCurrentMA(registerValue, gRSenseMOhm), currentMA, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is less than 0xffff (as
+            // 0xffff means no threshold set)
+            if (registerValue < 0xffff) {
+                success = setTwoBytes (0x10, registerValue);
+#ifdef DEBUG_LTC2943
+                if (success) {
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): current high threshold register set to 0x%04x (%d mA).\n",
+                    gAddress >> 1, registerValue, registerToCurrentMA(registerValue, gRSenseMOhm));
+                }
+#endif
+            }
+        }
     }
     
     return success;
@@ -882,11 +1013,17 @@ bool BatteryGaugeLtc2943::getCurrentHigh(int32_t *pCurrentMA)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x10, &data);
-    if (success && pCurrentMA) {
-        *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+    if (gReady) {
+        success = getTwoBytes (0x10, &data);
+        if (success && pCurrentMA) {
+            *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): current high threshold register is 0x%04x (%d mA).\n",
+            gAddress >> 1, data, registerToCurrentMA(data, gRSenseMOhm));
+#endif
+        }
     }
-
+    
     return success;
 }
 
@@ -896,9 +1033,14 @@ bool BatteryGaugeLtc2943::isCurrentHighSet(void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0xFFFF, so if it is not that it is set
-    if (getTwoBytes (0x10, &data) && (data != 0xFFFF)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0xffff, so if it is not that it is set
+        if (getTwoBytes (0x10, &data) && (data != 0xffff)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): current high threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -907,21 +1049,42 @@ bool BatteryGaugeLtc2943::isCurrentHighSet(void)
 /// Clear current alert upper threshold.
 bool BatteryGaugeLtc2943::clearCurrentHigh(void)
 {
-    return setTwoBytes (0x10, 0xFFFF);
+    bool success = false;
+    
+    if (gReady) {
+        success = setTwoBytes (0x10, 0xffff);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): current high threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+    
+    return success;
 }
 
 /// Set current alert lower threshold.
 bool BatteryGaugeLtc2943::setCurrentLow(int32_t currentMA)
 {
     bool success = false;
-    uint16_t registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
+    uint16_t registerValue;
 
-    // Only write the value if it is greate than 0 (as
-    // 0 means no threshold set)
-    if (registerValue > 0) {
-        success = setTwoBytes (0x12, registerValue);
+    if (gReady) {
+        registerValue = currentMAToRegister (currentMA, gRSenseMOhm);
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToCurrentMA(registerValue, gRSenseMOhm), currentMA, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is greate than 0 (as
+            // 0 means no threshold set)
+            if (registerValue > 0) {
+                success = setTwoBytes (0x12, registerValue);
+#ifdef DEBUG_LTC2943
+                if (success) {
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): current low threshold register set to 0x%04x (%d mA).\n",
+                           gAddress >> 1, registerValue, registerToCurrentMA(registerValue, gRSenseMOhm));
+                }
+#endif
+            }
+        }
     }
-    
+
     return success;
 }
 
@@ -931,11 +1094,17 @@ bool BatteryGaugeLtc2943::getCurrentLow(int32_t *pCurrentMA)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x12, &data);
-    if (success && pCurrentMA) {
-        *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+    if (gReady) {
+        success = getTwoBytes (0x12, &data);
+        if (success && pCurrentMA) {
+            *pCurrentMA = registerToCurrentMA(data, gRSenseMOhm);
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): current low threshold register is 0x%04x (%d mA).\n",
+            gAddress >> 1, data, registerToCurrentMA(data, gRSenseMOhm));
+#endif
+        }
     }
-
+    
     return success;
 }
 
@@ -945,9 +1114,14 @@ bool BatteryGaugeLtc2943::isCurrentLowSet(void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0, so if it is not that it is set
-    if (getTwoBytes (0x12, &data) && (data != 0)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0, so if it is not that it is set
+        if (getTwoBytes (0x12, &data) && (data != 0)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): current low threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -956,21 +1130,42 @@ bool BatteryGaugeLtc2943::isCurrentLowSet(void)
 /// Clear current alert lower threshold.
 bool BatteryGaugeLtc2943::clearCurrentLow(void)
 {
-    return setTwoBytes (0x12, 0);
+    bool success = false;
+    
+    if (gReady) {
+        success = setTwoBytes (0x12, 0);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): current low threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+    
+    return success;
 }
 
 /// Set charge alert upper threshold.
 bool BatteryGaugeLtc2943::setChargeHigh(int32_t chargeMAH)
 {
     bool success = false;
-    uint16_t registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+    uint16_t registerValue;
 
-    // Only write the value if it is less than 0xFFFF (as
-    // 0xFFFF means no threshold set)
-    if (registerValue < 0xFFFF) {
-        success = setTwoBytes (0x04, registerValue);
+    if (gReady) {
+        registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToChargeMAH(registerValue, gRSenseMOhm, gPrescaler), chargeMAH, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is less than 0xffff (as
+            // 0xffff means no threshold set)
+            if (registerValue < 0xffff) {
+                success = setTwoBytes (0x04, registerValue);
+#ifdef DEBUG_LTC2943
+                if (success) {
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge high threshold register set to 0x%04x (%d mAh).\n",
+                           gAddress >> 1, registerValue, registerToChargeMAH(registerValue, gRSenseMOhm, gPrescaler));
+                }
+#endif
+            }
+        }
     }
-    
+
     return success;
 }
 
@@ -980,11 +1175,19 @@ bool BatteryGaugeLtc2943::getChargeHigh(int32_t *pChargeMAH)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x04, &data);
-    if (success && pChargeMAH) {
-        *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+    if (gReady) {
+        success = getTwoBytes (0x04, &data);
+        if (success && pChargeMAH) {
+            *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+#ifdef DEBUG_LTC2943
+            if (success) {
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge high threshold register is 0x%04x (%d mAh).\n",
+                       gAddress >> 1, data, registerToChargeMAH(data, gRSenseMOhm, gPrescaler));
+            }
+#endif
+        }
     }
-
+    
     return success;
 }
 
@@ -994,9 +1197,14 @@ bool BatteryGaugeLtc2943::isChargeHighSet(void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0xFFFF, so if it is not that it is set
-    if (getTwoBytes (0x04, &data) && (data != 0xFFFF)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0xffff, so if it is not that it is set
+        if (getTwoBytes (0x04, &data) && (data != 0xffff)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge high threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -1005,21 +1213,42 @@ bool BatteryGaugeLtc2943::isChargeHighSet(void)
 /// Clear charge alert upper threshold.
 bool BatteryGaugeLtc2943::clearChargeHigh(void)
 {
-    return setTwoBytes (0x04, 0xFFFF);
+    bool success = false;
+    
+    if (gReady) {
+        success = setTwoBytes (0x04, 0xffff);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge high threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+    
+    return success;
 }
 
 /// Set charge alert lower threshold.
 bool BatteryGaugeLtc2943::setChargeLow(int32_t chargeMAH)
 {
     bool success = false;
-    uint16_t registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+    uint16_t registerValue;
 
-    // Only write the value if it is greater than 0 (as
-    // 0 means no threshold set)
-    if (registerValue > 0) {
-        success = setTwoBytes (0x06, registerValue);
+    if (gReady) {
+        registerValue = chargeMAHToRegister (chargeMAH, gRSenseMOhm, gPrescaler);
+        // Check for overflow in conversion to the register value
+        if (TOLERANCE_CHECK (registerToChargeMAH(registerValue, gRSenseMOhm, gPrescaler), chargeMAH, LTC_2943_TOLERANCE)) {
+            // Only write the value if it is greater than 0 (as
+            // 0 means no threshold set)
+            if (registerValue > 0) {
+                success = setTwoBytes (0x06, registerValue);
+#ifdef DEBUG_LTC2943
+                if (success) {
+                    printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge low threshold register set to 0x%04x (%d mAh).\n",
+                           gAddress >> 1, registerValue, registerToChargeMAH(registerValue, gRSenseMOhm, gPrescaler));
+                }
+#endif
+            }
+        }
     }
-    
+
     return success;
 }
 
@@ -1029,11 +1258,19 @@ bool BatteryGaugeLtc2943::getChargeLow(int32_t *pChargeMAH)
     bool success = false;
     uint16_t data;
     
-    success = getTwoBytes (0x06, &data);
-    if (success && pChargeMAH) {
-        *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+    if (gReady) {
+        success = getTwoBytes (0x06, &data);
+        if (success && pChargeMAH) {
+            *pChargeMAH = registerToChargeMAH(data, gRSenseMOhm, gPrescaler);
+#ifdef DEBUG_LTC2943
+            if (success) {
+                printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge low threshold register is 0x%04x (%d mAh).\n",
+                       gAddress >> 1, data, registerToChargeMAH(data, gRSenseMOhm, gPrescaler));
+            }
+#endif
+        }
     }
-
+    
     return success;
 }
 
@@ -1043,9 +1280,14 @@ bool BatteryGaugeLtc2943::isChargeLowSet(void)
     bool isSet = false;
     uint16_t data;
     
-    // Default value is 0, so if it is not that it is set
-    if (getTwoBytes (0x06, &data) && (data != 0)) {
-        isSet = true;
+    if (gReady) {
+        // Default value is 0, so if it is not that it is set
+        if (getTwoBytes (0x06, &data) && (data != 0)) {
+            isSet = true;
+#ifdef DEBUG_LTC2943
+            printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge low threshold register is set.\n", gAddress >> 1);
+#endif
+        }
     }
     
     return isSet;
@@ -1054,8 +1296,16 @@ bool BatteryGaugeLtc2943::isChargeLowSet(void)
 /// Clear charge alert lower threshold.
 bool BatteryGaugeLtc2943::clearChargeLow(void)
 {
-    return setTwoBytes (0x06, 0);
+    bool success = false;
+
+    if (gReady) {
+        success = setTwoBytes (0x06, 0);
+#ifdef DEBUG_LTC2943
+        printf("BatteryGaugeLtc2943 (I2C 0x%02x): charge low threshold register is cleared.\n", gAddress >> 1);
+#endif
+    }
+    
+    return success;
 }
 
 // End Of File
-

@@ -529,7 +529,7 @@ bool BatteryGaugeLtc2943::getRemainingCharge (int32_t *pChargeMAH)
                     // we can't supply what was requested but report the charge used number anyway
                     // in case it is useful
                     success = false;
-                    *pChargeMAH = registerToChargeMAH (data - 0x7FFF, gRSenseMOhm, gPrescaler);
+                    *pChargeMAH = registerToChargeMAH (0x7FFF - data, gRSenseMOhm, gPrescaler);
                 }
             }
 

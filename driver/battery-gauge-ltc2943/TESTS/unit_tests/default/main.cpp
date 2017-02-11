@@ -190,10 +190,19 @@ void test_charging() {
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->setChargingComplete(BATTERY_CAPACITY_MAH));
     
-    // Normal case
+    // Initialise the battery gauge
     TEST_ASSERT(pBatteryGauge->init(gpI2C, RSENSE_MOHM));
+    
+    // If setChargingComplete() has not been called then a check on the charge
+    // level should fail but the remaining charge value should still be
+    // filled in, just with the charge used instead
+    remainingChargeMAH = 0x7FFFFFFF;
+    TEST_ASSERT_FALSE(pBatteryGauge->getRemainingCharge(&remainingChargeMAH));
+    TEST_ASSERT(remainingChargeMAH != 0x7FFFFFFF);
+
+    // Normal case
     TEST_ASSERT(pBatteryGauge->setChargingComplete(BATTERY_CAPACITY_MAH));
-    // Read the remaining capacity value back    
+    // Read the remaining capacity value back
     TEST_ASSERT(pBatteryGauge->getRemainingCharge(&remainingChargeMAH));
     // Check that it is the same as what we said
     TEST_ASSERT(remainingChargeMAH == BATTERY_CAPACITY_MAH);

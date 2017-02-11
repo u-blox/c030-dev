@@ -70,7 +70,7 @@ public:
     // \param rSenseMOhm the value of the sense resistor being used, in milli Ohms.
     //\ param address 7-bit I2C address of the LiPo gauge chip.
     //\ param prescaler the prescaler value to use, valid values being 1, 4, 16, 64, 256, 1024 and 4096.
-    //        Refer to page 11 of the LTC2943 data sheet for information on chosing the prescaler value
+    //        Refer to page 11 of the LTC2943 data sheet for information on choosing the prescaler value
     //        for a given battery capacity and peak current.
     // \param alcc how to configure the Alert/Charge Complete pin, see page 10 of the LTC2943 data sheet.
     // \return true if successful, otherwise false.
@@ -119,8 +119,8 @@ public:
     // has been fully charged and the setChargingComplete()
     // function called since the LTC2943 chip was last physically reset.
     // If this is not the case the pChargeMAh value will be filled in
-    // with the charge used instead and the return value will be set to
-    // false.
+    // with the charge used instead (in case this is useful) and the
+    // return value will be set to false.
     // \param pChargeMAH place to put the charge reading.
     // \return true if successful, otherwise false.
     bool getRemainingCharge (int32_t *pChargeMAH);
@@ -134,6 +134,9 @@ public:
     bool getRemainingPercentage (int32_t *pBatteryPercent);
     
     /// Get the reason(s) for an alert.
+    // Note: as with all the other API functions here, this should
+    // not be called from an interrupt function as the comms with the
+    // LTC2943 chip over I2C will take too long.
     // \return a bit-map containing the Alert reasons that
     //         can be tested against the values of the Alert enum.
     char getAlertReason (void);

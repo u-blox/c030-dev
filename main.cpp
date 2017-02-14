@@ -31,9 +31,6 @@
 /// RSense (in mOhm) on UTM board for LTC2943 battery gauge
 #define LTC2943_RSENSE_MOHM 68
 
-/// Default RSense (in mOhm) for BQ27441 battery gauge
-#define BQ27441_RSENSE_MOHM 10
-
 // Required for UTM board
 static DigitalOut i2CPullUpBar(P1_1, 0);
  
@@ -70,7 +67,7 @@ int main()
       
         pBatteryGaugeBq27441 = new BatteryGaugeBq27441();
         if (pBatteryGaugeBq27441 != NULL) {
-            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C, BQ27441_RSENSE_MOHM);
+            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C);
             if (!gaugeBq27441Success) {
                 printf ("Unable to initialise BQ27441 battery gauge chip.\n");
             }

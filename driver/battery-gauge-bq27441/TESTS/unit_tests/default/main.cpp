@@ -176,8 +176,8 @@ void test_remaining_percentage() {
     TEST_ASSERT(pBatteryGauge->getRemainingPercentage(NULL));
 }
 
-// Test advanced functions to read/write the configuration of the chip
-void test_advanced() {
+// Test advanced functions to read the configuration of the chip
+void test_advanced_1() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint8_t subClassId = 80; // IT Cfg
     int32_t offset = 0;
@@ -187,12 +187,7 @@ void test_advanced() {
     char data2[MAX_CONFIG_BLOCK_SIZE];
     uint32_t deadArea2 = 0xdeadbeef;
     uint32_t sealCode = 0;
-    int16_t tmp;
     
-    // All calls should fail if the battery gauge has not been initialised
-    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
-    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
-        
     // Initialise the battery gauge
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
 
@@ -235,6 +230,22 @@ void test_advanced() {
     // The remainder of data2 should be zero
     TEST_ASSERT_EQUAL_UINT8_ARRAY(&(zeroArray[0]), &(data2[length]), sizeof(data2) - length);
     TEST_ASSERT_EQUAL_UINT32 (0xdeadbeef, deadArea2);
+}
+
+// Test advanced functions to write  configuration to the chip
+void test_advanced_2() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint8_t subClassId = 80; // IT Cfg
+    int32_t offset = 0;
+    int32_t length = MAX_CONFIG_BLOCK_SIZE - offset;
+    char data1[MAX_CONFIG_BLOCK_SIZE];
+    uint32_t deadArea1 = 0xdeadbeef;
+    char data2[MAX_CONFIG_BLOCK_SIZE];
+    uint32_t deadArea2 = 0xdeadbeef;
+    uint32_t sealCode = 0;
+    
+    // Initialise the battery gauge
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
 
     // Read Delta Voltage, two bytes at offset 39 in sub-class State, into data1
     subClassId = 82;
@@ -253,16 +264,7 @@ void test_advanced() {
     TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
     printf("%d bytes written to subClassID %d, offset %d:\n", length, subClassId, offset);
 
-    // Now read sub-class State back again, but use an offset/length combination that crosses
-    // a 32 byte boundary (which should fail)
-    subClassId = 82;
-    offset = 30;
-    length = 11;
-    memset(&(data2[0]), 0, sizeof (data2));
-    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data2[0])));
-    TEST_ASSERT_EQUAL_UINT32 (0xdeadbeef, deadArea1);
-    
-    // Now read it properly and check that the Delta Voltage really is the new value
+    // Read it back and check that the Delta Voltage really is the new value
     subClassId = 82;
     offset = 32;
     length = 9;
@@ -278,6 +280,41 @@ void test_advanced() {
     (data2[8])--;
     TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
     printf("%d bytes written to subClassID %d, offset %d:\n", length, subClassId, offset);
+}
+
+// Test fail cases of the advanced functions
+void test_advanced_3() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint8_t subClassId = 80; // IT Cfg
+    int32_t offset = 0;
+    int32_t length = MAX_CONFIG_BLOCK_SIZE - offset;
+    char data1[MAX_CONFIG_BLOCK_SIZE];
+    uint32_t deadArea1 = 0xdeadbeef;
+    
+    // All calls should fail if the battery gauge has not been initialised
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+        
+    // Initialise the battery gauge
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    
+    // Perform some reads of bad length/offset combinations
+    offset = 0;
+    length = 33;
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
+    offset = 1;
+    length = 32;
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
+    offset = 31;
+    length = 2;
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
+    offset = 32;
+    length = 33;
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
 }
 
 // Setup the test environment
@@ -296,7 +333,9 @@ Case cases[] = {
     Case("Current read", test_current),
     Case("Remaining capacity read", test_remaining_capacity),
     Case("Remaining percentage read", test_remaining_percentage),
-    Case("Advanced", test_advanced)
+    Case("Advanced read", test_advanced_1),
+    Case("Advanced write", test_advanced_2),
+    Case("Advanced read/write fail cases", test_advanced_3)
 };
 
 Specification specification(test_setup, cases);

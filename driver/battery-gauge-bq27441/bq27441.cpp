@@ -115,7 +115,7 @@ bool BatteryGaugeBq27441::readExtendedData(uint8_t subClassId, int32_t offset, i
     char block[32];
     char data[3];
 
-    if ((gpI2c != NULL) && (pData != NULL)) {            
+    if ((gpI2c != NULL) && (length <= 32) && (pData != NULL)) {            
         
         // The offset + length combination must not cross a 32-byte boundary
         if (offset / 32 == (offset + length - 1) / 32) {

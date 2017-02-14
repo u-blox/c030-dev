@@ -67,6 +67,7 @@ bool BatteryChargerBq24295::init (I2C * pI2c, uint8_t address)
     gAddress = address << 1;
 
     if (gpI2c != NULL) {
+        gpI2c->lock();
         // Read the revision status register
         data[0] = 0x0a;  // Revision status register gAddress
         data[1] = 0;
@@ -82,6 +83,7 @@ bool BatteryChargerBq24295::init (I2C * pI2c, uint8_t address)
             printf("BatteryChargerBq24295 (I2C 0x%02x): read 0x%02x from register 0x%02x, expected 0xc0.\r\n", gAddress >> 1, data[1], data[0]);
 #endif
         }
+        gpI2c->unlock();
     }
 
 #ifdef DEBUG_BQ24295
@@ -102,6 +104,7 @@ BatteryChargerBq24295::ChargerState BatteryChargerBq24295::getChargerState(void)
     char data[4];
 
     if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
         // Read the power-on configuration register
         data[0] = 0x01;  // Power-on configuration register gAddress
         data[1] = 0;
@@ -163,6 +166,7 @@ BatteryChargerBq24295::ChargerState BatteryChargerBq24295::getChargerState(void)
                 }
             }
         }
+        gpI2c->unlock();
     }
 
     return chargerState;
@@ -175,6 +179,7 @@ bool BatteryChargerBq24295::isExternalPowerPresent(void)
     char data[2];
 
     if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
         // Read the system status register
         data[0] = 0x08;  // System status register address
         data[1] = 0;
@@ -191,8 +196,9 @@ bool BatteryChargerBq24295::isExternalPowerPresent(void)
             } else {
                 printf("BatteryChargerBq24295 (I2C 0x%02x): external power is NOT present.\r\n", gAddress >> 1);
             }
-#endif                
+#endif
         }
+        gpI2c->unlock();
     }
 
     return externalPowerPresent;
@@ -205,6 +211,7 @@ BatteryChargerBq24295::ChargerFault BatteryChargerBq24295::getChargerFault(void)
     char data[2];
 
     if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
         // Read the fault register
         data[0] = 0x09;  // Fault register gAddress
         data[1] = 0;
@@ -261,6 +268,7 @@ BatteryChargerBq24295::ChargerFault BatteryChargerBq24295::getChargerFault(void)
 #endif
             }
         }
+        gpI2c->unlock();
     }
 
     return chargerFault;

@@ -43,10 +43,19 @@ public:
 
     /// Initialise the BQ27441 chip.
     // \param pI2c a pointer to the I2C instance to use.
-    // \param rSenseMOhm the value of the sense resistor being used, in milli Ohms.
     //\ param address 7-bit I2C address of the battery gauge chip.
     // \return true if successful, otherwise false.
-    bool init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
+    bool init (I2C * pI2c, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
+
+    /// Determine whether a battery has been detected or not.
+    // \return true if a battery has been detected, otherwise false.
+    bool isBatteryDetected (void);
+    
+    /// Switch on/off the battery capacity monitor
+    // \param onNotOff true to begin monitoring battery capacity, false to stop.
+    // \param isSlow set this to true to save power if the battery current is not fluctuating very much.
+    // \return true if successful, otherwise false.
+    bool setMonitor (bool onNotOff, bool isSlow = false);
 
     /// Read the temperature of the BQ27441 chip.
     // \param pTemperatureC place to put the temperature reading.
@@ -58,6 +67,11 @@ public:
     // \return true if successful, otherwise false.
     bool getVoltage (int32_t *pVoltageMV);
 
+    /// Read the current flowing from the battery.
+    // \param pCurrentMA place to put the current reading.
+    // \return true if successful, otherwise false.
+    bool getCurrent (int32_t *pCurrentMA);
+
     /// Read the remaining available battery energy.
     // \param pCapacityMAh place to put the capacity reading.
     // \return true if successful, otherwise false.
@@ -68,6 +82,43 @@ public:
     // \return true if successful, otherwise false.
     bool getRemainingPercentage (int32_t *pBatteryPercent);
 
+    /// An advanced function to read configuration data from the BQ27441 chip memory.
+    // Please refer to the TI BQ27441 technical reference manual for details of classId,
+    // offset, the meanings of the data structures and their lengths.
+    // Note: the chip handles the data for each sub-class in 32 byte blocks and the offset/
+    // length combination used must respect this.  For instance:
+    //
+    // Sub-class N (length 87 bytes)
+    //          bytes 0 to 31                      bytes 32 to 63                  bytes 64 to 86
+    //  --------------------------------  --------------------------------  -----------------------
+    // |         Data Block 0           ||    xx    Data Block 1  yy      ||zz       Data Block 2  |
+    //  --------------------------------  --------------------------------  -----------------------
+    //
+    // To read item xx, 2 bytes long at offset 36, one would specify an offset of 36 and a length
+    // of 2.  To read both xx and yy at the same time (yy being 2 bytes long at offset 56),
+    // one could specify an offset of 36 and a length of 21.  However, one could not read xx, yy
+    // and zz at the same time, or yy and zz at the same time, since they fall into different blocks;
+    // two separate reads would be required.
+    // \param subClassId the sub-class ID of the block.
+    // \param offset the offset of the data within the class.
+    // \param length the amount of data to read.
+    // \param pData a place to put the read data.
+    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
+    // \return true if successful, otherwise false.
+    bool advancedGetConfig(uint8_t subClassId, int32_t offset, int32_t length, char * pData, uint32_t sealCode = 0);
+
+    /// An advanced function to write configuration data to the BQ27441 chip memory.
+    // Please refer to the TI BQ27441 technical reference manual for details of classId,
+    // offset, the meanings of the data structures and their lengths.  See also the note above
+    // advancedGetConfig() about how to use offset and length.
+    // \param subClassId the sub-class ID of the block.
+    // \param offset the offset of the data within the class.
+    // \param length the length of the data to be written.
+    // \param pData a pointer to the data to be written.
+    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
+    // \return true if successful, otherwise false.
+    bool advancedSetConfig(uint8_t subClassId, int32_t offset, int32_t length, const char * pData, uint32_t sealCode = 0);
+
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;
@@ -77,16 +128,27 @@ protected:
     bool gReady;
 
     /// Compute the checksum of a block of memory in the chip.
-    // \return  the checksum value.
-    uint8_t computeChecksum();
+    // \param pData a pointer to the 32 byte data block.
+    // \return the checksum value.
+    uint8_t computeChecksum(const char * pData);
 
+    /// Read data of a given length and class ID.
+    // \param subClassId the sub-class ID of the block.
+    // \param offset the offset of the data within the class.
+    // \param pData a place to put the read data.
+    // \param length the size of the place to put the data block.
+    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
+    // \return true if successful, otherwise false.
+    bool readExtendedData(uint8_t subClassId, int32_t offset, int32_t length, char * pData, uint32_t sealCode);
+    
     /// Write an extended data block.
-    // \param classId the class ID of the block.
+    // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param pData a pointer to the data to be written.
-    // \param len the length of the data to be written.
+    // \param length the size of the data to be written.
+    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool writeExtendedData(uint8_t classId, uint8_t offset, const char * pData, uint8_t len);
+    bool writeExtendedData(uint8_t subClassId, int32_t offset, int32_t length, const char * pData, uint32_t sealCode);
 
     /// Read two bytes starting at a given address.
     // \param registerAddress the register address to start reading from.

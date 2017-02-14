@@ -77,6 +77,10 @@ public:
     bool init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address = BATTERY_GAUGE_LTC2943_ADDRESS,
                int32_t prescaler = BATTERY_GAUGE_LTC2943_PRESCALER_DEFAULT, Alcc alcc = ALCC_OFF);
 
+    /// Determine whether a battery has been detected or not.
+    // \return true if it is detected otherwise false.
+    bool isBatteryDetected (void);
+    
     /// Switch on/off the battery capacity monitor
     // \param onNotOff true to begin monitoring battery capacity, false to stop.
     // \param isSlow set this to true to save power if the battery current is not fluctuating very much.

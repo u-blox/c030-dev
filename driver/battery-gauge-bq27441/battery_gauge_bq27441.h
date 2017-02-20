@@ -26,13 +26,14 @@
 // GENERAL COMPILE-TIME CONSTANTS
 // ----------------------------------------------------------------
 
-/// Device I2C address
+/// Device I2C address.
 #define BATTERY_GAUGE_BQ27441_ADDRESS 0x55
 
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
 
+/// BQ27441 battery gauge driver.
 class BatteryGaugeBq27441 {
 public:
 
@@ -47,16 +48,16 @@ public:
     // \return true if successful, otherwise false.
     bool init (I2C * pI2c, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
 
-    /// Determine whether a battery has been detected or not.
-    // \return true if a battery has been detected, otherwise false.
-    bool isBatteryDetected (void);
-    
     /// Switch on/off the battery capacity monitor
     // \param onNotOff true to begin monitoring battery capacity, false to stop.
     // \param isSlow set this to true to save power if the battery current is not fluctuating very much.
     // \return true if successful, otherwise false.
     bool setMonitor (bool onNotOff, bool isSlow = false);
 
+    /// Determine whether a battery has been detected or not.
+    // \return true if a battery has been detected, otherwise false.
+    bool isBatteryDetected (void);
+    
     /// Read the temperature of the BQ27441 chip.
     // \param pTemperatureC place to put the temperature reading.
     // \return true if successful, otherwise false.
@@ -126,6 +127,14 @@ protected:
     uint8_t gAddress;
     /// Flag to indicate device is ready
     bool gReady;
+    /// Flag to indicate that monitor mode is active
+    bool gMonitorOn;
+
+    /// Read two bytes starting at a given address.
+    // \param registerAddress the register address to start reading from.
+    // \param pBytes place to put the two bytes.
+    // \return true if successful, otherwise false.
+    bool getTwoBytes (uint8_t registerAddress, uint16_t *pBytes);
 
     /// Compute the checksum of a block of memory in the chip.
     // \param pData a pointer to the 32 byte data block.
@@ -150,11 +159,13 @@ protected:
     // \return true if successful, otherwise false.
     bool writeExtendedData(uint8_t subClassId, int32_t offset, int32_t length, const char * pData, uint32_t sealCode);
 
-    /// Read two bytes starting at a given address.
-    // \param registerAddress the register address to start reading from.
-    // \param pBytes place to put the two bytes.
+    /// Make sure that the device is awake and has taken a reading.
     // \return true if successful, otherwise false.
-    bool getTwoBytes (uint8_t registerAddress, uint16_t *pBytes);
+    bool makeAdcReading(void);
+
+    /// Set Hibernate mode.
+    // \return true if successful, otherwise false.
+    bool setHibernate(void);
 };
 
 #endif

@@ -19,7 +19,7 @@
  * This file defines the API to the Linear Technology LTC2943 battery gauge chip.
  */
 
-// Define this to print debug information
+/// Define this to print debug information.
 //#define DEBUG_LTC2943
 
 #include <mbed.h>
@@ -33,14 +33,14 @@
 // GENERAL COMPILE-TIME CONSTANTS
 // ----------------------------------------------------------------
 
-// How long to wait for one ADC read of temperature, voltage and current
-// to be performed
+/// How long to wait for one ADC read of temperature, voltage and current
+// to be performed.
 #define ADC_READ_WAIT_MS 100
 
-// The tolerance allowed for value conversions into the threshold registers
+/// The tolerance allowed for value conversions into the threshold registers.
 #define LTC_2943_TOLERANCE 2
 
-// Check that a value is within tolerance
+/// Check that a value is within tolerance.
 #define TOLERANCE_CHECK(value, intendedValue, tolerance) ((value - intendedValue <=  tolerance) && (value - intendedValue >=  -tolerance))
 
 // ----------------------------------------------------------------
@@ -52,6 +52,7 @@
 // ----------------------------------------------------------------
 
 /// Read two bytes from an address.
+// Note: gpI2c should be locked before this is called.
 bool BatteryGaugeLtc2943::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes)
 {
     bool success = false;
@@ -76,6 +77,7 @@ bool BatteryGaugeLtc2943::getTwoBytes (uint8_t registerAddress, uint16_t *pBytes
 }
 
 /// Set two bytes, starting from an address.
+// Note: gpI2c should be locked before this is called.
 bool BatteryGaugeLtc2943::setTwoBytes (uint8_t registerAddress, uint16_t bytes)
 {
     bool success = false;
@@ -96,6 +98,7 @@ bool BatteryGaugeLtc2943::setTwoBytes (uint8_t registerAddress, uint16_t bytes)
 }
 
 /// Ensure that the ADC of the chip has taken a reading recently.
+// Note: gpI2c should be locked before this is called.
 bool BatteryGaugeLtc2943::makeAdcReading (void)
 {
     bool success = false;
@@ -136,6 +139,7 @@ bool BatteryGaugeLtc2943::makeAdcReading (void)
 }
 
 /// Convert a 16 bit register reading into a temperature reading in C.
+// Note: gpI2c should be locked before this is called.
 int32_t BatteryGaugeLtc2943::registerToTemperatureC (uint16_t data)
 {
     // From the data sheet the temperature (in Kelvin) is

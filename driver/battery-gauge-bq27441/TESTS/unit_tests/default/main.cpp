@@ -68,6 +68,25 @@ void test_init() {
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
 }
 
+// Test that battery capacity monitoring can be performed
+void test_monitor() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    
+    // Call should fail if the battery gauge has not been initialised
+    TEST_ASSERT_FALSE(pBatteryGauge->setMonitor(true));
+    
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    // Normal case
+    TEST_ASSERT(pBatteryGauge->setMonitor(true));    
+    // TODO do something to assess whether it's actually working
+    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    
+    // Normal case, slow mode
+    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));    
+    // TODO do something to assess whether it's actually working slowly
+    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+}
+
 // Test that battery detection can be performed
 // TODO: find a way to check that a battery is not detected correctly
 void test_battery_detection() {
@@ -320,13 +339,14 @@ void test_advanced_3() {
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea using a reasonable timeout in seconds
-    GREENTEA_SETUP(20, "default_auto");
+    GREENTEA_SETUP(60, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
 // Test cases
 Case cases[] = {
     Case("Initialisation", test_init),
+    Case("Monitoring", test_monitor),
     Case("Battery detection", test_battery_detection),
     Case("Temperature read", test_temperature),
     Case("Voltage read", test_voltage),

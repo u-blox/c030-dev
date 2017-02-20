@@ -26,16 +26,17 @@
 // GENERAL COMPILE-TIME CONSTANTS
 // ----------------------------------------------------------------
 
-/// Device I2C address
+/// Device I2C address.
 #define BATTERY_GAUGE_LTC2943_ADDRESS 0x64
 
-/// Default prescaler value
+/// Default prescaler value.
 #define BATTERY_GAUGE_LTC2943_PRESCALER_DEFAULT 4096
 
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
 
+/// LTC2943 battery gauge driver.
 class BatteryGaugeLtc2943 {
 public:
 

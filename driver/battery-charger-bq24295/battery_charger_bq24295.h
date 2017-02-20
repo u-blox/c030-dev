@@ -26,13 +26,14 @@
 // GENERAL COMPILE-TIME CONSTANTS
 // ----------------------------------------------------------------
 
-/// Device I2C address
+/// Device I2C address.
 #define BATTERY_CHARGER_BQ24295_ADDRESS 0x6B
 
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
 
+/// BQ27441 battery charger driver.
 class BatteryChargerBq24295 {
 public:
     /// Charger state.
@@ -88,9 +89,9 @@ public:
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;
-    // The address of the device.
+    /// The address of the device.
     uint8_t gAddress;
-    // Flag to indicate device is ready
+    /// Flag to indicate device is ready
     bool gReady;
 };
 

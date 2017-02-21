@@ -77,7 +77,7 @@ void test_monitor() {
     
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
     // Normal case
-    TEST_ASSERT(pBatteryGauge->setMonitor(true));    
+    TEST_ASSERT(pBatteryGauge->setMonitor(true));
     // TODO do something to assess whether it's actually working
     TEST_ASSERT(pBatteryGauge->setMonitor(false));
     
@@ -103,7 +103,7 @@ void test_battery_detection() {
 // Test that a temperature reading can be performed
 void test_temperature() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
-    int32_t temperatureC;
+    int32_t temperatureC = MIN_TEMPERATURE_READING_C - 1;
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->getTemperature(&temperatureC));
@@ -122,7 +122,7 @@ void test_temperature() {
 // Test that a voltage reading can be performed
 void test_voltage() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
-    int32_t voltageMV;
+    int32_t voltageMV = MIN_VOLTAGE_READING_MV - 1;
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->getVoltage(&voltageMV));
@@ -141,7 +141,7 @@ void test_voltage() {
 // Test that a current reading can be performed
 void test_current() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
-    int32_t currentMA;
+    int32_t currentMA = MIN_CURRENT_READING_MA - 1;
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->getCurrent(&currentMA));
@@ -160,7 +160,7 @@ void test_current() {
 // Test that a remaining capacity reading can be performed
 void test_remaining_capacity() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
-    int32_t capacityMAh;
+    int32_t capacityMAh = MIN_CAPACITY_READING_MAH - 1;
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->getRemainingCapacity(&capacityMAh));
@@ -179,7 +179,7 @@ void test_remaining_capacity() {
 // Test that a remaining percentage reading can be performed
 void test_remaining_percentage() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
-    int32_t batteryPercent;
+    int32_t batteryPercent = 101;
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->getRemainingPercentage(&batteryPercent));
@@ -205,7 +205,6 @@ void test_advanced_1() {
     uint32_t deadArea1 = 0xdeadbeef;
     char data2[MAX_CONFIG_BLOCK_SIZE];
     uint32_t deadArea2 = 0xdeadbeef;
-    uint32_t sealCode = 0;
     
     // Initialise the battery gauge
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
@@ -260,8 +259,6 @@ void test_advanced_2() {
     char data1[MAX_CONFIG_BLOCK_SIZE];
     uint32_t deadArea1 = 0xdeadbeef;
     char data2[MAX_CONFIG_BLOCK_SIZE];
-    uint32_t deadArea2 = 0xdeadbeef;
-    uint32_t sealCode = 0;
     
     // Initialise the battery gauge
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
@@ -308,7 +305,6 @@ void test_advanced_3() {
     int32_t offset = 0;
     int32_t length = MAX_CONFIG_BLOCK_SIZE - offset;
     char data1[MAX_CONFIG_BLOCK_SIZE];
-    uint32_t deadArea1 = 0xdeadbeef;
     
     // All calls should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
@@ -336,10 +332,150 @@ void test_advanced_3() {
     TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
 }
 
+// Test that the chip can be sealed and unsealed
+// Note: once this chip is sealed the only way to unseal it persistently once more is to
+// cycle the power.  Hence if this test fails, in fact if any test fails, it is best
+// to cycle the power to the board 'cos the chip probably won't be happy otherwise.
+void test_advanced_seal() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint8_t subClassId = 80; // IT Cfg
+    int32_t offset = 78; // Position of the "TermV valid t" item at offset 78
+    int32_t length = 1; // Length of "TermV valid t"
+    char data1[MAX_CONFIG_BLOCK_SIZE];
+    char data2[MAX_CONFIG_BLOCK_SIZE];
+    char data3[MAX_CONFIG_BLOCK_SIZE];
+    int32_t value;
+    
+    memset(&(data1[0]), 0, sizeof (data1));
+    memset(&(data2[0]), 0, sizeof (data2));
+    memset(&(data3[0]), 0, sizeof (data3));
+
+    // Make sure that the device is not sealed from a previous field test run
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->advancedUnseal());
+
+    delete pBatteryGauge;
+    pBatteryGauge = new BatteryGaugeBq27441();
+    delete pBatteryGauge;
+    // Calls should fail if the battery gauge has not been initialised
+    printf ("Calling advancedIsSealed()...\n");
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedIsSealed());
+    printf ("Calling advancedSeal()...\n");
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSeal());
+    printf ("Calling advancedUnseal()...\n");
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedUnseal());
+    
+    // Normal case
+    printf ("Calling init()...\n");
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    printf ("Calling advancedIsSealed()...\n");
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedIsSealed());
+    // This call should pass
+    printf ("Calling advancedGetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId , offset, length, &(data1[0])));
+    
+    // Now seal it
+    printf ("Calling advancedSeal()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedSeal());
+    printf ("Calling advancedIsSealed()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedIsSealed());
+    memcpy (&(data2[0]), &(data1[0]), sizeof (data2));
+    // Try to increment the "TermV valid t" item
+    (data2[0])++;
+    // These calls should all be unaffected by sealing
+    printf ("Calling advancedSetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
+    printf ("Calling advancedGetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data3[0])));
+    TEST_ASSERT(memcmp (&(data2[0]), &(data3[0]), sizeof (data2)) == 0);
+     // Put "TermV valid t" back as it was
+    (data2[0])--;
+    printf ("Calling advancedSetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
+    printf ("Calling setMonitor(\"true\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(true));
+    printf ("Calling isBatteryDetected()...\n");
+    TEST_ASSERT(pBatteryGauge->isBatteryDetected());
+    printf ("Calling getTemperature()...\n");
+    TEST_ASSERT(pBatteryGauge->getTemperature(&value));
+    printf ("Calling getVoltage()...\n");
+    TEST_ASSERT(pBatteryGauge->getVoltage(&value));
+    printf ("Calling getCurrent()...\n");
+    TEST_ASSERT(pBatteryGauge->getCurrent(&value));
+    printf ("Calling getRemainingCapacity()...\n");
+    TEST_ASSERT(pBatteryGauge->getRemainingCapacity(&value));
+    printf ("Calling getRemainingPercentage()...\n");
+    TEST_ASSERT(pBatteryGauge->getRemainingPercentage(&value));
+    printf ("Calling setMonitor(\"true\", \"true\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));
+    printf ("Calling setMonitor(\"false\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+
+    // Now unseal it
+    printf ("Calling advancedUnseal()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedUnseal());
+    printf ("Calling advancedIsSealed()...\n");
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedIsSealed());
+    // These calls should all still work
+    // Try to increment the "TermV valid t" item
+    (data2[0])++;
+    printf ("Calling advancedSetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
+    printf ("Calling advancedGetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data3[0])));
+    TEST_ASSERT(memcmp (&(data2[0]), &(data3[0]), sizeof (data2)) == 0);
+     // Put "TermV valid t" back as it was
+    (data2[0])--;
+    printf ("Calling advancedSetConfig()...\n");
+    TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
+    printf ("Calling setMonitor(\"true\", \"true\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));
+    printf ("Calling isBatteryDetected()...\n");
+    TEST_ASSERT(pBatteryGauge->isBatteryDetected());
+    printf ("Calling getTemperature()...\n");
+    TEST_ASSERT(pBatteryGauge->getTemperature(&value));
+    printf ("Calling getVoltage()...\n");
+    TEST_ASSERT(pBatteryGauge->getVoltage(&value));
+    printf ("Calling getCurrent()...\n");
+    TEST_ASSERT(pBatteryGauge->getCurrent(&value));
+    printf ("Calling getRemainingCapacity()...\n");
+    TEST_ASSERT(pBatteryGauge->getRemainingCapacity(&value));
+    printf ("Calling getRemainingPercentage()...\n");
+    TEST_ASSERT(pBatteryGauge->getRemainingPercentage(&value));
+    printf ("Calling setMonitor(\"false\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+
+    // Note: I had some tests in here to check that init() and
+    // advancedUnseal() behave when given the wrong seal code.
+    // However, as soon as the chip gets a wrong seal code it
+    // refuses to unseal again (I tried a 4 second delay but
+    // that didn't help).  This needs investigating.
+    
+    // Set monitoring back where it was
+    printf ("Calling setMonitor(\"false\")...\n");
+    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+}
+
+// Reset the BQ27441 battery gauge chip at the outset
+void test_advanced_reset() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    
+    // Call should fail if the battery gauge has not been initialised
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedReset());
+    
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    TEST_ASSERT(pBatteryGauge->advancedUnseal());
+    
+    // Normal case
+    TEST_ASSERT(pBatteryGauge->advancedReset());
+}
+
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea using a reasonable timeout in seconds
-    GREENTEA_SETUP(60, "default_auto");
+    // Note: timeout is quite long as the chip has 4 second
+    // timeouts in quite a lot of cases.
+    GREENTEA_SETUP(480, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
@@ -355,7 +491,9 @@ Case cases[] = {
     Case("Remaining percentage read", test_remaining_percentage),
     Case("Advanced read", test_advanced_1),
     Case("Advanced write", test_advanced_2),
-    Case("Advanced read/write fail cases", test_advanced_3)
+    Case("Advanced read/write fail cases", test_advanced_3),
+    Case("Advanced seal", test_advanced_seal),
+    Case("Advanced reset", test_advanced_reset)
 };
 
 Specification specification(test_setup, cases);

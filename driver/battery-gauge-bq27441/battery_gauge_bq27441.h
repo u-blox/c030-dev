@@ -29,6 +29,9 @@
 /// Device I2C address.
 #define BATTERY_GAUGE_BQ27441_ADDRESS 0x55
 
+/// The default seal code.
+#define SEAL_CODE_DEFAULT 0x8000
+
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
@@ -45,8 +48,9 @@ public:
     /// Initialise the BQ27441 chip.
     // \param pI2c a pointer to the I2C instance to use.
     //\ param address 7-bit I2C address of the battery gauge chip.
+    // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool init (I2C * pI2c, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS);
+    bool init (I2C * pI2c, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS, uint16_t sealCode = SEAL_CODE_DEFAULT);
 
     /// Switch on/off the battery capacity monitor
     // \param onNotOff true to begin monitoring battery capacity, false to stop.
@@ -99,38 +103,60 @@ public:
     // of 2.  To read both xx and yy at the same time (yy being 2 bytes long at offset 56),
     // one could specify an offset of 36 and a length of 21.  However, one could not read xx, yy
     // and zz at the same time, or yy and zz at the same time, since they fall into different blocks;
-    // two separate reads would be required.
+    // two separate reads are required.
     // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param length the amount of data to read.
     // \param pData a place to put the read data.
-    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool advancedGetConfig(uint8_t subClassId, int32_t offset, int32_t length, char * pData, uint32_t sealCode = 0);
+    bool advancedGetConfig(uint8_t subClassId, int32_t offset, int32_t length, char * pData);
 
     /// An advanced function to write configuration data to the BQ27441 chip memory.
     // Please refer to the TI BQ27441 technical reference manual for details of classId,
     // offset, the meanings of the data structures and their lengths.  See also the note above
-    // advancedGetConfig() about how to use offset and length.
+    // advancedGetConfig() about how to use offset and length.  If this function is used to
+    // change the seal code for the device then init() should be called once more to
+    // update the seal code stored in this driver.
     // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param length the length of the data to be written.
     // \param pData a pointer to the data to be written.
-    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool advancedSetConfig(uint8_t subClassId, int32_t offset, int32_t length, const char * pData, uint32_t sealCode = 0);
+    bool advancedSetConfig(uint8_t subClassId, int32_t offset, int32_t length, const char * pData);
 
+    /// Check if the chip is SEALED or UNSEALED.
+    // \return true if it is SEALED, otherwise false.
+    bool advancedIsSealed(void);
+
+    /// Put the chip into SEALED mode.
+    // \return true if successful, otherwise false.
+    bool advancedSeal(void);
+    
+    /// Send the seal code to the device to unseal it.
+    // Note: if the device is reset, as it is by the advancedGetConfig() call, then it
+    // will become sealed again.
+    // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
+    // \return true if successful, otherwise false.
+    bool advancedUnseal(uint16_t sealCode = SEAL_CODE_DEFAULT);
+
+    /// Do a hard reset of the chip, reinitialising RAM data to defaults from ROM.
+    // \return true if successful, otherwise false.
+    bool advancedReset(void);
+    
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;
     /// The address of the device.
     uint8_t gAddress;
-    /// Flag to indicate device is ready
+    /// The seal code for the device.
+    uint16_t gSealCode;
+    /// Flag to indicate device is ready.
     bool gReady;
-    /// Flag to indicate that monitor mode is active
+    /// Flag to indicate that monitor mode is active.
     bool gMonitorOn;
 
     /// Read two bytes starting at a given address.
+    // Note: gpI2c should be locked before this is called.
     // \param registerAddress the register address to start reading from.
     // \param pBytes place to put the two bytes.
     // \return true if successful, otherwise false.
@@ -142,28 +168,47 @@ protected:
     uint8_t computeChecksum(const char * pData);
 
     /// Read data of a given length and class ID.
+    // Note: gpI2c should be locked before this is called.
     // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param pData a place to put the read data.
     // \param length the size of the place to put the data block.
-    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool readExtendedData(uint8_t subClassId, int32_t offset, int32_t length, char * pData, uint32_t sealCode);
+    bool readExtendedData(uint8_t subClassId, int32_t offset, int32_t length, char * pData);
     
     /// Write an extended data block.
+    // Note: gpI2c should be locked before this is called.
     // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param pData a pointer to the data to be written.
     // \param length the size of the data to be written.
-    // \param sealCode the 32 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
-    bool writeExtendedData(uint8_t subClassId, int32_t offset, int32_t length, const char * pData, uint32_t sealCode);
+    bool writeExtendedData(uint8_t subClassId, int32_t offset, int32_t length, const char * pData);
 
+    /// Check if the chip is SEALED or UNSEALED.
+    // Note: gpI2c should be locked before this is called.
+    // \return true if it is SEALED, otherwise false.
+    bool isSealed(void);
+
+    /// Put the chip into SEALED mode.
+    // Note: gpI2c should be locked before this is called.
+    // \return true if successful, otherwise false.
+    bool seal(void);
+
+    /// Unseal the device.
+    // Note: gpI2c should be locked before this is called.
+    // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
+    // \return true if successful, otherwise false.
+    bool unseal(uint16_t sealCode);
+    
     /// Make sure that the device is awake and has taken a reading.
+    // Note: the function does its own locking of gpI2C so that it isn't
+    // held for the entire time we wait for ADC readings to complete.
     // \return true if successful, otherwise false.
     bool makeAdcReading(void);
 
     /// Set Hibernate mode.
+    // Note: gpI2c should be locked before this is called.
     // \return true if successful, otherwise false.
     bool setHibernate(void);
 };

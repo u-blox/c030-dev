@@ -115,8 +115,8 @@ public:
     // Please refer to the TI BQ27441 technical reference manual for details of classId,
     // offset, the meanings of the data structures and their lengths.  See also the note above
     // advancedGetConfig() about how to use offset and length.  If this function is used to
-    // change the seal code for the device then init() should be called once more to
-    // update the seal code stored in this driver.
+    // change the seal code for the chip then init() should be called once more to
+    // update the seal code used by this driver.
     // \param subClassId the sub-class ID of the block.
     // \param offset the offset of the data within the class.
     // \param length the length of the data to be written.
@@ -124,6 +124,23 @@ public:
     // \return true if successful, otherwise false.
     bool advancedSetConfig(uint8_t subClassId, int32_t offset, int32_t length, const char * pData);
 
+    /// Send a control word (see section 4.1 of the BQ27441 technical reference manual).
+    // Note: if the chip is sealed and the control word being sent only works for unsealed
+    // access then it is up to the caller to unseal the chip first.
+    // \param controlWord the control word to send.
+    // \param pDataReturned a place to put the word of data that could be returned,
+    //        depending on which control word is used (may be NULL).
+    // \return true if successful, otherwise false.
+    bool advancedSendControlWord (uint16_t controlWord, uint16_t *pDataReturned);
+    
+    /// Read two bytes starting at a given address on the chip.
+    // See sections 4.2 to 4.20 of the BQ27441 technical reference manual for the list
+    // of addresses.
+    // \param address the start address to read from.  For instance, for temperature this is 0x02.
+    // \param pDataReturned a place to put the word of data returned.
+    // \return true if successful, otherwise false.
+    bool advancedGet (uint8_t address, uint16_t *pDataReturned);
+    
     /// Check if the chip is SEALED or UNSEALED.
     // \return true if it is SEALED, otherwise false.
     bool advancedIsSealed(void);
@@ -132,10 +149,10 @@ public:
     // \return true if successful, otherwise false.
     bool advancedSeal(void);
     
-    /// Send the seal code to the device to unseal it.
-    // Note: if the device is reset, as it is by the advancedGetConfig() call, then it
+    /// Send the seal code to the chip to unseal it.
+    // Note: if the chip is reset, as it is by the advancedGetConfig() call, then it
     // will become sealed again.
-    // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
+    // \param sealCode the 16 bit seal code that will unseal the chip if it is sealed.
     // \return true if successful, otherwise false.
     bool advancedUnseal(uint16_t sealCode = SEAL_CODE_DEFAULT);
 
@@ -195,13 +212,13 @@ protected:
     // \return true if successful, otherwise false.
     bool seal(void);
 
-    /// Unseal the device.
+    /// Unseal the chip.
     // Note: gpI2c should be locked before this is called.
-    // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
+    // \param sealCode the 16 bit seal code that will unseal the chip if it is sealed.
     // \return true if successful, otherwise false.
     bool unseal(uint16_t sealCode);
     
-    /// Make sure that the device is awake and has taken a reading.
+    /// Make sure that the chip is awake and has taken a reading.
     // Note: the function does its own locking of gpI2C so that it isn't
     // held for the entire time we wait for ADC readings to complete.
     // \return true if successful, otherwise false.

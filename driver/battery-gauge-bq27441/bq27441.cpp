@@ -35,7 +35,8 @@
 // ----------------------------------------------------------------
 
 /// How many loops to wait for a configuration update to be permitted.
-#define CONFIG_UPDATE_LOOPS 50
+// Experience suggests that the limit really does need to be this large.
+#define CONFIG_UPDATE_LOOPS 200
 
 /// How long to delay when running around the config update loop.
 #define CONFIG_UPDATE_LOOP_DELAY_MS 100
@@ -806,7 +807,7 @@ bool BatteryGaugeBq27441::getVoltage (int32_t *pVoltageMV)
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
         if (gMonitorOn || makeAdcReading()) {            
-            gpI2c->lock();            
+            gpI2c->lock();
             // Read from the voltage register address
             if (getTwoBytes (0x04, &data)) {
                 success = true;
@@ -999,6 +1000,68 @@ bool BatteryGaugeBq27441::advancedSetConfig(uint8_t subClassId, int32_t offset, 
     return success;
 }
 
+/// Send a control word.
+bool BatteryGaugeBq27441::advancedSendControlWord (uint16_t controlWord, uint16_t *pDataReturned)
+{
+    bool success = false;
+    char data[3];
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Send the control command
+        data[0] = 0x00;  // Set address to first register for control
+        data[1] = (char) controlWord;        // First byte of controlWord
+        data[2] = (char) (controlWord >> 8); // Second byte of controlWord
+        if (gpI2c->write(gAddress, &(data[0]), 3) == 0) {
+            // Read the two bytes returned if requested
+            if (pDataReturned != NULL) {
+                if (getTwoBytes(0, pDataReturned)) {
+                    success = true;
+#ifdef DEBUG_BQ27441
+                    printf("BatteryGaugeBq27441 (I2C 0x%02x): sent control word 0x%04x, read back 0x%04x.\n", gAddress >> 1, controlWord, *pDataReturned);
+#endif
+                }
+            } else {
+                success = true;
+#ifdef DEBUG_BQ27441
+                printf("BatteryGaugeBq27441 (I2C 0x%02x): sent control word 0x%04x.\n", gAddress >> 1, controlWord);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Read two bytes starting at a given address on the chip.
+bool BatteryGaugeBq27441::advancedGet (uint8_t address, uint16_t *pDataReturned)
+{
+    bool success = false;
+    uint16_t value;
+
+    if (gReady && (gpI2c != NULL)) {
+        // Make sure there's a recent reading, as most
+        // of these commands involve the chip having done one
+        if (gMonitorOn || makeAdcReading()) {            
+            gpI2c->lock();
+            // Read the data
+            if (getTwoBytes(address, &value)) {
+                success = true;
+#ifdef DEBUG_BQ27441
+                printf("BatteryGaugeBq27441 (I2C 0x%02x): read 0x%04x from addresses 0x%02x and 0x%02x.\n", gAddress >> 1, value, address, address + 1);
+#endif
+                if (pDataReturned != NULL) {
+                    *pDataReturned = value;
+                }
+            }
+            gpI2c->unlock();
+        }
+    }
+
+    return success;
+}
+
 /// Check if the chip is SEALED or UNSEALED.
 bool BatteryGaugeBq27441::advancedIsSealed()
 {
@@ -1045,11 +1108,22 @@ bool BatteryGaugeBq27441::advancedSeal()
 bool BatteryGaugeBq27441::advancedUnseal(uint16_t sealCode)
 {
     bool success = false;
+    char updateStatus;
 
     if (gReady && (gpI2c != NULL)) {
         gpI2c->lock();
-        // Unseal
-        success = unseal(sealCode);
+        // Unseal and read the Update Status value
+        if (unseal(sealCode) && readExtendedData(82, 2, 1, &updateStatus)) {
+            // If the update status value has the top bit set then the chip will
+            // reseal itself on the next reset, so this bit needs to be cleared to
+            // unseal it properly
+            if ((updateStatus & (1 << 7)) != 0) {
+                updateStatus &= ~(1 << 7);
+                success = writeExtendedData(82, 2, 1, &updateStatus);
+            } else {
+                success = true;
+            }
+        }
 
         // Return to sleep if we are allowed to
         if (!gMonitorOn && !setHibernate()) {

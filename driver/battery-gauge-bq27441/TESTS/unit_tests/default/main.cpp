@@ -196,7 +196,7 @@ void test_remaining_percentage() {
 }
 
 // Test advanced functions to read the configuration of the chip
-void test_advanced_1() {
+void test_advanced_config_1() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint8_t subClassId = 80; // IT Cfg
     int32_t offset = 0;
@@ -250,8 +250,8 @@ void test_advanced_1() {
     TEST_ASSERT_EQUAL_UINT32 (0xdeadbeef, deadArea2);
 }
 
-// Test advanced functions to write  configuration to the chip
-void test_advanced_2() {
+// Test advanced functions to write configuration to the chip
+void test_advanced_config_2() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint8_t subClassId = 80; // IT Cfg
     int32_t offset = 0;
@@ -298,8 +298,8 @@ void test_advanced_2() {
     printf("%d bytes written to subClassID %d, offset %d:\n", length, subClassId, offset);
 }
 
-// Test fail cases of the advanced functions
-void test_advanced_3() {
+// Test fail cases of the advanced configuration functions
+void test_advanced_config_3() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint8_t subClassId = 80; // IT Cfg
     int32_t offset = 0;
@@ -332,10 +332,54 @@ void test_advanced_3() {
     TEST_ASSERT_FALSE(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data1[0])));
 }
 
+// Send a control word to the BQ27441 battery gauge chip
+void test_advanced_control() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint16_t controlWord = 0x0002; // get FW version
+    uint16_t response = 0;
+    
+    // Call should fail if the battery gauge has not been initialised
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedSendControlWord(controlWord, &response));
+    
+    // Initialise the battery gauge
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    
+    // Normal case
+    TEST_ASSERT(pBatteryGauge->advancedSendControlWord(controlWord, &response));
+    // FW version must be 0x0109
+    TEST_ASSERT_EQUAL_UINT16(0x0109, response);
+
+    // The parameter is allowed to be null
+    TEST_ASSERT(pBatteryGauge->advancedSendControlWord(controlWord, NULL));
+}
+
+// Read using a standard command from the BQ27441 battery gauge chip
+void test_advanced_get() {
+    BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint8_t address = 0x02; // Temperature
+    uint16_t value = 0;
+    int32_t temperatureC = -1;
+    
+    // Call should fail if the battery gauge has not been initialised
+    TEST_ASSERT_FALSE(pBatteryGauge->advancedGet(address, &value));
+    
+    // Initialise the battery gauge
+    TEST_ASSERT(pBatteryGauge->init(gpI2C));
+    
+    // Normal case
+    TEST_ASSERT(pBatteryGauge->advancedGet(address, &value));
+    // Get the temperature via the standard API command
+    TEST_ASSERT(pBatteryGauge->getTemperature(&temperatureC));
+    // Convert the value returned into a temperature reading and compare
+    // it with the real answer, allowing a 1 degree tolerance in case
+    // it has changed between readings.
+    TEST_ASSERT_INT32_WITHIN (1, temperatureC, ((int32_t) value / 10) - 273);
+
+    // The parameter is allowed to be null
+    TEST_ASSERT(pBatteryGauge->advancedGet(address, NULL));
+}
+
 // Test that the chip can be sealed and unsealed
-// Note: once this chip is sealed the only way to unseal it persistently once more is to
-// cycle the power.  Hence if this test fails, in fact if any test fails, it is best
-// to cycle the power to the board 'cos the chip probably won't be happy otherwise.
 void test_advanced_seal() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     uint8_t subClassId = 80; // IT Cfg
@@ -356,7 +400,6 @@ void test_advanced_seal() {
 
     delete pBatteryGauge;
     pBatteryGauge = new BatteryGaugeBq27441();
-    delete pBatteryGauge;
     // Calls should fail if the battery gauge has not been initialised
     printf ("Calling advancedIsSealed()...\n");
     TEST_ASSERT_FALSE(pBatteryGauge->advancedIsSealed());
@@ -445,20 +488,26 @@ void test_advanced_seal() {
     printf ("Calling setMonitor(\"false\")...\n");
     TEST_ASSERT(pBatteryGauge->setMonitor(false));
 
-    // Note: I had some tests in here to check that init() and
+    // TODO: I had some tests in here to check that init() and
     // advancedUnseal() behave when given the wrong seal code.
     // However, as soon as the chip gets a wrong seal code it
     // refuses to unseal again (I tried a 4 second delay but
     // that didn't help).  This needs investigating.
-    
-    // Set monitoring back where it was
-    printf ("Calling setMonitor(\"false\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
 }
 
 // Reset the BQ27441 battery gauge chip at the outset
 void test_advanced_reset() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
+    uint8_t subClassId = 80; // IT Cfg
+    int32_t offset = 78; // Position of the "TermV valid t" item at offset 78
+    int32_t length = 1;  // Length of "TermV valid t"
+    char data1[MAX_CONFIG_BLOCK_SIZE];
+    char data2[MAX_CONFIG_BLOCK_SIZE];
+    char data3[MAX_CONFIG_BLOCK_SIZE];
+    
+    memset(&(data1[0]), 0, sizeof (data1));
+    memset(&(data2[0]), 0, sizeof (data2));
+    memset(&(data3[0]), 0, sizeof (data3));
     
     // Call should fail if the battery gauge has not been initialised
     TEST_ASSERT_FALSE(pBatteryGauge->advancedReset());
@@ -467,7 +516,19 @@ void test_advanced_reset() {
     TEST_ASSERT(pBatteryGauge->advancedUnseal());
     
     // Normal case
+    // Increment the "TermV valid t" item
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data1[0])));
+    memcpy (&(data2[0]), &(data1[0]), sizeof (data2));
+    (data2[0])++;
+    TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
+    // Read it back to make sure it was set
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data3[0])));
+    TEST_ASSERT(memcmp (&(data2[0]), &(data3[0]), sizeof (data2)) == 0);
+    
+    // Now reset the chip and check that the value is back to what it was before
     TEST_ASSERT(pBatteryGauge->advancedReset());
+    TEST_ASSERT(pBatteryGauge->advancedGetConfig(subClassId, offset, length, &(data3[0])));
+    TEST_ASSERT(memcmp (&(data1[0]), &(data3[0]), sizeof (data1)) == 0);
 }
 
 // Setup the test environment
@@ -489,9 +550,11 @@ Case cases[] = {
     Case("Current read", test_current),
     Case("Remaining capacity read", test_remaining_capacity),
     Case("Remaining percentage read", test_remaining_percentage),
-    Case("Advanced read", test_advanced_1),
-    Case("Advanced write", test_advanced_2),
-    Case("Advanced read/write fail cases", test_advanced_3),
+    Case("Advanced config read", test_advanced_config_1),
+    Case("Advanced config write", test_advanced_config_2),
+    Case("Advanced config read/write fail cases", test_advanced_config_3),
+    Case("Advanced control", test_advanced_control),
+    Case("Advanced get", test_advanced_get),
     Case("Advanced seal", test_advanced_seal),
     Case("Advanced reset", test_advanced_reset)
 };

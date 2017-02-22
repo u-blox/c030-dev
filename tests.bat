@@ -17,9 +17,10 @@ if not 'x%2'=='x' (set "outfile=%~2")
 if not 'x%3'=='x' (set exe=%~3)
 
 echo Running "%exe%" %count% time(s), or until there is an error, output going to "%outfile%".
+if exist "%outfile%" del "%outfile%"
 for /L %%a IN (1, 1, %count%) DO (
 echo Run %%a of %count%: "%exe%"
-%exe% > "%outfile%" 2>&1
+%exe% >> "%outfile%" 2>&1
 if errorlevel 1 goto errorEnd
 )
 echo All runs completed.

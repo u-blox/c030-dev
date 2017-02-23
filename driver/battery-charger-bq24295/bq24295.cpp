@@ -236,7 +236,7 @@ BatteryChargerBq24295::ChargerState BatteryChargerBq24295::getChargerState(void)
 /// Get whether external power is present or not.
 bool BatteryChargerBq24295::isExternalPowerPresent(void)
 {
-    bool externalPowerPresent = false;
+    bool isPresent = false;
     char reg;
 
     if (gReady && (gpI2c != NULL)) {
@@ -245,11 +245,11 @@ bool BatteryChargerBq24295::isExternalPowerPresent(void)
         if (getRegister(0x08, &reg)) {
            // See if we have external power (bit 3)
             if ((reg & 0x04) != 0) {
-                externalPowerPresent = true;
+                isPresent = true;
             }
 
 #ifdef DEBUG_BQ24295
-            if (externalPowerPresent) {
+            if (isPresent) {
                 printf("BatteryChargerBq24295 (I2C 0x%02x): external power is present.\r\n", gAddress >> 1);
             } else {
                 printf("BatteryChargerBq24295 (I2C 0x%02x): external power is NOT present.\r\n", gAddress >> 1);
@@ -259,7 +259,7 @@ bool BatteryChargerBq24295::isExternalPowerPresent(void)
         gpI2c->unlock();
     }
 
-    return externalPowerPresent;
+    return isPresent;
 }
 
 /// Read the temperature of the battery.
@@ -353,8 +353,18 @@ BatteryChargerBq24295::ChargerFault BatteryChargerBq24295::getChargerFault(void)
 bool BatteryChargerBq24295::enableOtg (void)
 {
     bool success = false;
-    
-    // TODO
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // OTG enable is bit 5 of the power-on configuration register
+        success = setRegisterBits(0x01, (1 << 5));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): OTG charging now ENABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
     
     return success;
 }
@@ -363,8 +373,18 @@ bool BatteryChargerBq24295::enableOtg (void)
 bool BatteryChargerBq24295::disableOtg (void)
 {
     bool success = false;
-    
-    // TODO
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // OTG enable is bit 5 of the power-on configuration register
+        success = clearRegisterBits(0x01, (1 << 5));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): OTG charging now DISABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
     
     return success;
 }
@@ -373,8 +393,26 @@ bool BatteryChargerBq24295::disableOtg (void)
 bool BatteryChargerBq24295::isOtgEnabled (void)
 {
     bool isEnabled = false;
+    char reg;
     
-    // TODO
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the power-on configuration register
+        if (getRegister(0x01, &reg)) {
+            // OTG enable is bit 5 of the power-on configuration register
+            if ((reg & (1 << 5)) != 0) {
+                isEnabled = true;
+            }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): OTG charging is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): OTG charging is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
     
     return isEnabled;
 }
@@ -383,8 +421,18 @@ bool BatteryChargerBq24295::isOtgEnabled (void)
 bool BatteryChargerBq24295::enableCharging (void)
 {
     bool success = false;
-    
-    // TODO
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Charge enable is bit 4 of the power-on configuration register
+        success = setRegisterBits(0x01, (1 << 4));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now ENABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
     
     return success;
 }
@@ -394,17 +442,45 @@ bool BatteryChargerBq24295::disableCharging (void)
 {
     bool success = false;
     
-    // TODO
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Charge enable is bit 4 of the power-on configuration register
+        success = clearRegisterBits(0x01, (1 << 4));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now DISABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
     
     return success;
 }
 
-/// Get the whether charging is  enabled or disabled.
+/// Get the whether charging is enabled or disabled.
 bool BatteryChargerBq24295::isChargingEnabled (void)
 {
     bool isEnabled = false;
+    char reg;
     
-    // TODO
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the power-on configuration register
+        if (getRegister(0x01, &reg)) {
+            // Charge enable is bit 4 of the power-on configuration register
+            if ((reg & (1 << 4)) != 0) {
+                isEnabled = true;
+            }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
     
     return isEnabled;
 }
@@ -413,9 +489,41 @@ bool BatteryChargerBq24295::isChargingEnabled (void)
 bool BatteryChargerBq24295::setSystemVoltage (int32_t voltageMV)
 {
     bool success = false;
-    
-    // TODO
-    
+    char reg;
+    int32_t codedValue;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the power-on configuration register
+        if (getRegister(0x01, &reg)) {
+            // System voltage is in bits 1 to 3,
+            // coded to base "100 mV" with
+            // an offset of 3000 mV.
+            if ((voltageMV >= 3000) && (voltageMV <= 3700)) {
+                codedValue = voltageMV;
+                codedValue = (codedValue - 3000) / 100;
+                // If the voltage is not an exact multiple of 100,
+                // add one to the coded value to make sure we don't
+                // go under the requested system voltage
+                if (voltageMV % 100 != 0) {
+                    codedValue++;
+                }
+                codedValue = (codedValue & 0x07) << 1;
+                
+                reg &= ~(0x07 << 1);
+                reg |= (char) codedValue;
+                
+                success = setRegister (0x01, reg);
+#ifdef DEBUG_BQ24295
+                if (success) {
+                    printf("BatteryChargerBq24295 (I2C 0x%02x): system voltage set to %.3f V.\r\n", gAddress >> 1, (float) voltageMV / 1000);
+                }
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
     return success;
 }
 
@@ -423,9 +531,29 @@ bool BatteryChargerBq24295::setSystemVoltage (int32_t voltageMV)
 bool BatteryChargerBq24295::getSystemVoltage (int32_t *pVoltageMV)
 {
     bool success = false;
-    
-    // TODO
-    
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the power-on configuration register
+        if (getRegister(0x01, &reg)) {
+            success = true;
+            if (pVoltageMV != NULL) {
+                // Input voltage limit is in bits 1 to 3
+                // Base voltage
+                *pVoltageMV = 3000;
+                // Shift reg down and add the number of multiples
+                // of 100 mV
+                reg = (reg >> 1) & 0x07;
+                *pVoltageMV += ((int32_t) reg) * 100;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): system voltage is %.3f V.\r\n", gAddress >> 1, (float) *pVoltageMV / 1000);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
     return success;
 }
 
@@ -711,9 +839,35 @@ bool BatteryChargerBq24295::getRechargingVoltageThreshold (int32_t *pVoltageMV)
 bool BatteryChargerBq24295::setFastChargingCurrentLimit (int32_t currentMA)
 {
     bool success = false;
-    
-    // TODO
-    
+    char reg;
+    int32_t codedValue;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge current control register
+        if (getRegister(0x02, &reg)) {
+            // Fast charging current limit is in
+            // bits 2 to 7, coded to base "64 mA" with
+            // an offset of 512 mA.
+            if ((currentMA >= 512) && (currentMA <= 3008)) {
+                codedValue = currentMA;
+                codedValue = (codedValue - 512) / 64;
+                codedValue = (codedValue & 0x3f) << 2;
+                
+                reg &= ~(0x3f << 2);
+                reg |= (char) codedValue;
+                
+                success = setRegister (0x02, reg);
+#ifdef DEBUG_BQ24295
+                if (success) {
+                    printf("BatteryChargerBq24295 (I2C 0x%02x): fast charging current limit set to %.3f A.\r\n", gAddress >> 1, (float) currentMA / 1000);
+                }
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
     return success;
 }
 
@@ -721,9 +875,29 @@ bool BatteryChargerBq24295::setFastChargingCurrentLimit (int32_t currentMA)
 bool BatteryChargerBq24295::getFastChargingCurrentLimit (int32_t *pCurrentMA)
 {
     bool success = false;
-    
-    // TODO
-    
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge current control register
+        if (getRegister(0x02, &reg)) {
+            success = true;
+            if (pCurrentMA != NULL) {
+                // Fast charging current limit is in bits 2 to 7
+                // Base current
+                *pCurrentMA = 512;
+                // Shift reg down and add the number of multiples
+                // of 64 mA
+                reg = (reg >> 2) & 0x3f;
+                *pCurrentMA += ((int32_t) reg) * 64;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): fast charge current limit is %.3f A.\r\n", gAddress >> 1, (float) *pCurrentMA / 1000);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
     return success;
 }
 

@@ -20,7 +20,7 @@
  */
 
 /// Define these to print debug information.
-#define DEBUG_BQ27441
+//#define DEBUG_BQ27441
 //#define DEBUG_BQ27441_BLOCK_DATA
 
 #include <mbed.h>
@@ -798,7 +798,7 @@ bool BatteryGaugeBq27441::getTemperature (int32_t *pTemperatureC)
     return success;
 }
 
-/// Get the Voltage of the battery.
+/// Get the voltage of the battery.
 bool BatteryGaugeBq27441::getVoltage (int32_t *pVoltageMV)
 {
     bool success = false;

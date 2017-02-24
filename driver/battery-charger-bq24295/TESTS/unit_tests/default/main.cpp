@@ -19,11 +19,14 @@ using namespace utest::v1;
 #define MIN_PRECHARGING_CURRENT_LIMIT_MA 128
 #define MAX_CHARGING_TERMINATION_CURRENT_MA 2048
 #define MIN_CHARGING_TERMINATION_CURRENT_MA 128
+#define MAX_CHARGING_VOLTAGE_LIMIT_MV  4400
+#define MIN_CHARGING_VOLTAGE_LIMIT_MV  3504
+#define MIN_BOOST_VOLTAGE_MV 4550
+#define MAX_BOOST_VOLTAGE_MV 5510
 
 #ifndef NUM_RAND_ITERATIONS
 // The number of iterations of random input values in various tests
-//#define NUM_RAND_ITERATIONS 50
-#define NUM_RAND_ITERATIONS 1
+#define NUM_RAND_ITERATIONS 50
 #endif
 
 #ifndef PIN_I2C_SDA
@@ -82,21 +85,24 @@ void test_external_power_present() {
 }
 
 // Test that we can read the charger fault from the BQ24295 battery charger
+// NOTE: if this test fails, make sure you haven't got an actual fault. Better
+// to reset the chip/board entirely before running these tests so that one
+// doesn't occur.
 void test_charger_fault() {
     BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
-    BatteryChargerBq24295::ChargerFault chargerFault = BatteryChargerBq24295::CHARGER_FAULT_UNKNOWN;
+    char bitmap = (char) BatteryChargerBq24295::CHARGER_FAULT_NONE;
     
-    // Call should fail if the battery charger has not been initialised
-    chargerFault = pBatteryCharger->getChargerFault();
-    TEST_ASSERT(chargerFault == BatteryChargerBq24295::CHARGER_FAULT_UNKNOWN);
+    // Call should return no faults if the battery charger has not been initialised
+    bitmap = pBatteryCharger->getChargerFaults();
+    TEST_ASSERT_EQUAL_INT8((char) BatteryChargerBq24295::CHARGER_FAULT_NONE, bitmap);
     
     // Normal case
     TEST_ASSERT(pBatteryCharger->init(gpI2C));
-    chargerFault = pBatteryCharger->getChargerFault();
-    printf ("Charger fault is %d.\n", chargerFault);
-    // Range check
-    TEST_ASSERT(chargerFault != BatteryChargerBq24295::CHARGER_FAULT_UNKNOWN);
-    TEST_ASSERT(chargerFault < BatteryChargerBq24295::MAX_NUM_CHARGER_FAULTS);
+    bitmap = pBatteryCharger->getChargerFaults();
+    printf ("Charger fault is %d.\n", bitmap);
+    // Should be just the watchdog as we are in host mode and are not servicing the watchdog
+    // TODO: find a way to test other faults
+    TEST_ASSERT_EQUAL_INT8((char) BatteryChargerBq24295::CHARGER_FAULT_WATCHDOG_EXPIRED, bitmap);
 }
 
 // Test that we can read and change the input voltage and current limits
@@ -114,7 +120,6 @@ void test_input_limits() {
     TEST_ASSERT_FALSE(pBatteryCharger->getInputCurrentLimit(&getValue));
     TEST_ASSERT_FALSE(pBatteryCharger->setInputVoltageLimit(getValue));
     TEST_ASSERT_FALSE(pBatteryCharger->enableInputLimits());
-    TEST_ASSERT_FALSE(pBatteryCharger->areInputLimitsEnabled());
     TEST_ASSERT_FALSE(pBatteryCharger->disableInputLimits());
     
     // Initialise the battery charger
@@ -126,14 +131,10 @@ void test_input_limits() {
     enabledOriginal = pBatteryCharger->areInputLimitsEnabled();
 
     // Voltage and current beyond the limits
-    setValue = MIN_INPUT_VOLTAGE_LIMIT_MV - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setInputVoltageLimit(setValue));
-    setValue = MAX_INPUT_VOLTAGE_LIMIT_MV + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setInputVoltageLimit(setValue));
-    setValue = MIN_INPUT_CURRENT_LIMIT_MA - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setInputCurrentLimit(setValue));
-    setValue = MAX_INPUT_CURRENT_LIMIT_MA + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setInputCurrentLimit(setValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setInputVoltageLimit(MIN_INPUT_VOLTAGE_LIMIT_MV - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setInputVoltageLimit(MAX_INPUT_VOLTAGE_LIMIT_MV + 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setInputCurrentLimit(MIN_INPUT_CURRENT_LIMIT_MA - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setInputCurrentLimit(MAX_INPUT_CURRENT_LIMIT_MA + 1));
     
     // Voltage and current at the limits
     TEST_ASSERT(pBatteryCharger->setInputVoltageLimit(MIN_INPUT_VOLTAGE_LIMIT_MV));
@@ -198,10 +199,8 @@ void test_charging_enable() {
     bool chargingEnabled;
     
     // Call should fail if the battery charger has not been initialised
-    TEST_ASSERT_FALSE(pBatteryCharger->isOtgEnabled());
     TEST_ASSERT_FALSE(pBatteryCharger->enableOtg());
     TEST_ASSERT_FALSE(pBatteryCharger->disableOtg());
-    TEST_ASSERT_FALSE(pBatteryCharger->isChargingEnabled());
     TEST_ASSERT_FALSE(pBatteryCharger->enableCharging());
     TEST_ASSERT_FALSE(pBatteryCharger->disableCharging());
     
@@ -259,10 +258,8 @@ void test_system_voltage() {
     TEST_ASSERT(pBatteryCharger->getSystemVoltage(&voltageOriginal));
 
     // Beyond the limits
-    setValue = MIN_SYSTEM_VOLTAGE_MV - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setSystemVoltage(setValue));
-    setValue = MAX_SYSTEM_VOLTAGE_MV + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setSystemVoltage(setValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setSystemVoltage(MIN_SYSTEM_VOLTAGE_MV - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setSystemVoltage(MAX_SYSTEM_VOLTAGE_MV + 1));
     
     // At the limits
     TEST_ASSERT(pBatteryCharger->setSystemVoltage(MIN_SYSTEM_VOLTAGE_MV));
@@ -273,7 +270,7 @@ void test_system_voltage() {
     TEST_ASSERT_EQUAL_INT32(MAX_SYSTEM_VOLTAGE_MV, getValue);
 
     // The voltage read back should be at least the value requested and
-    // not more than 100 mv greater
+    // not more than 100 mV greater
     for (uint32_t x = 0; x < NUM_RAND_ITERATIONS; x++) {
         setValue = MIN_SYSTEM_VOLTAGE_MV + rand() % (MAX_SYSTEM_VOLTAGE_MV - MIN_SYSTEM_VOLTAGE_MV + 1);
         TEST_ASSERT(pBatteryCharger->setSystemVoltage(setValue));
@@ -308,10 +305,8 @@ void test_fast_charging_current_limits() {
     TEST_ASSERT(pBatteryCharger->getFastChargingCurrentLimit(&currentOriginal));
 
     // Beyond the limits
-    setValue = MIN_FAST_CHARGING_CURRENT_LIMIT_MA - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingCurrentLimit(setValue));
-    setValue = MAX_FAST_CHARGING_CURRENT_LIMIT_MA + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingCurrentLimit(setValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingCurrentLimit(MIN_FAST_CHARGING_CURRENT_LIMIT_MA - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingCurrentLimit(MAX_FAST_CHARGING_CURRENT_LIMIT_MA + 1));
     
     // At the limits
     TEST_ASSERT(pBatteryCharger->setFastChargingCurrentLimit(MIN_FAST_CHARGING_CURRENT_LIMIT_MA));
@@ -336,52 +331,6 @@ void test_fast_charging_current_limits() {
 
     // Put the initial value back when we're done
     TEST_ASSERT(pBatteryCharger->setFastChargingCurrentLimit(currentOriginal));
-}
-
-// Test setting the boost mode lower temperature limit
-void test_boost_temperature_limit() {
-    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
-    int32_t originalValue;
-    int32_t setValue;
-    int32_t getValue;
-    
-    // Call should return false if the battery charger has not been initialised
-    TEST_ASSERT_FALSE(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_FALSE(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    
-    // Initialise the battery charger
-    TEST_ASSERT(pBatteryCharger->init(gpI2C));
-    
-    // Save the initial value
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&originalValue));
-
-    // Either it's -10 or it's -20
-    setValue = 1;
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_EQUAL_INT32(-10, getValue);
-    setValue = 0;
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_EQUAL_INT32(-10, getValue);
-    setValue = -9;
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_EQUAL_INT32(-10, getValue);
-    setValue = -10;
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_EQUAL_INT32(-10, getValue);
-    setValue = -11;
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(setValue));
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
-    TEST_ASSERT_EQUAL_INT32(-20, getValue);
-    
-    // Parameter can be NULL
-    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(NULL));
-
-    // Put the initial value back when we're done
-    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(originalValue));    
 }
 
 // Test that we enable and disable the ICGH/IPRECH margin
@@ -434,10 +383,8 @@ void test_precharging_current_limits() {
     TEST_ASSERT(pBatteryCharger->getPrechargingCurrentLimit(&currentOriginal));
 
     // Beyond the limits
-    setValue = MIN_PRECHARGING_CURRENT_LIMIT_MA - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setPrechargingCurrentLimit(setValue));
-    setValue = MAX_PRECHARGING_CURRENT_LIMIT_MA + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setPrechargingCurrentLimit(setValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setPrechargingCurrentLimit(MIN_PRECHARGING_CURRENT_LIMIT_MA - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setPrechargingCurrentLimit(MAX_PRECHARGING_CURRENT_LIMIT_MA + 1));
     
     // At the limits
     TEST_ASSERT(pBatteryCharger->setPrechargingCurrentLimit(MIN_PRECHARGING_CURRENT_LIMIT_MA));
@@ -476,7 +423,6 @@ void test_charging_termination_current() {
     TEST_ASSERT_FALSE(pBatteryCharger->getChargingTerminationCurrent(&getValue));
     TEST_ASSERT_FALSE(pBatteryCharger->setChargingTerminationCurrent(getValue));
     TEST_ASSERT_FALSE(pBatteryCharger->enableChargingTermination());
-    TEST_ASSERT_FALSE(pBatteryCharger->isChargingTerminationEnabled());
     TEST_ASSERT_FALSE(pBatteryCharger->disableChargingTermination());
     
     // Initialise the battery charger
@@ -487,10 +433,8 @@ void test_charging_termination_current() {
     terminationEnabled = pBatteryCharger->isChargingTerminationEnabled();
 
     // Beyond the limits
-    setValue = MIN_CHARGING_TERMINATION_CURRENT_MA - 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setChargingTerminationCurrent(setValue));
-    setValue = MAX_CHARGING_TERMINATION_CURRENT_MA + 1;
-    TEST_ASSERT_FALSE(pBatteryCharger->setChargingTerminationCurrent(setValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setChargingTerminationCurrent(MIN_CHARGING_TERMINATION_CURRENT_MA - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setChargingTerminationCurrent(MAX_CHARGING_TERMINATION_CURRENT_MA + 1));
     
     // At the limits
     TEST_ASSERT(pBatteryCharger->setChargingTerminationCurrent(MIN_CHARGING_TERMINATION_CURRENT_MA));
@@ -530,10 +474,380 @@ void test_charging_termination_current() {
     }
 }
 
+// Test that we can read and change the various charging voltage limits
+void test_charging_voltage_limits() {
+    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
+    int32_t chargingOriginal;
+    int32_t fastChargingOriginal;
+    int32_t rechargingOriginal;
+    int32_t setValue;
+    int32_t getValue;
+    
+    // Calls should return false if the battery charger has not been initialised
+    TEST_ASSERT_FALSE(pBatteryCharger->getChargingVoltageLimit(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setChargingVoltageLimit(getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingVoltageThreshold(getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setRechargingVoltageThreshold(getValue));
+    
+    // Initialise the battery charger
+    TEST_ASSERT(pBatteryCharger->init(gpI2C));
+    
+    // Save the initial values
+    TEST_ASSERT(pBatteryCharger->getChargingVoltageLimit(&chargingOriginal));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&fastChargingOriginal));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&rechargingOriginal));
+
+    // Beyond the limits for the charging voltage
+    TEST_ASSERT_FALSE(pBatteryCharger->setChargingVoltageLimit(MIN_CHARGING_VOLTAGE_LIMIT_MV - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setChargingVoltageLimit(MAX_CHARGING_VOLTAGE_LIMIT_MV + 1));
+    
+    // At the limits for the charging voltage
+    TEST_ASSERT(pBatteryCharger->setChargingVoltageLimit(MIN_CHARGING_VOLTAGE_LIMIT_MV));
+    TEST_ASSERT(pBatteryCharger->getChargingVoltageLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(MIN_CHARGING_VOLTAGE_LIMIT_MV, getValue);
+    TEST_ASSERT(pBatteryCharger->setChargingVoltageLimit(MAX_CHARGING_VOLTAGE_LIMIT_MV));
+    TEST_ASSERT(pBatteryCharger->getChargingVoltageLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(MAX_CHARGING_VOLTAGE_LIMIT_MV, getValue);
+    
+    // The charging voltage limit read back should not be more than 16 mV below the value requested
+    for (uint32_t x = 0; x < NUM_RAND_ITERATIONS; x++) {
+        setValue = MIN_CHARGING_VOLTAGE_LIMIT_MV + rand() % (MAX_CHARGING_VOLTAGE_LIMIT_MV - MIN_CHARGING_VOLTAGE_LIMIT_MV + 1);
+        TEST_ASSERT(pBatteryCharger->setChargingVoltageLimit(setValue));
+        getValue = -1;
+        TEST_ASSERT(pBatteryCharger->getChargingVoltageLimit(&getValue));
+        TEST_ASSERT((getValue > setValue - 16) && (getValue <= setValue));
+        TEST_ASSERT((getValue >= MIN_CHARGING_VOLTAGE_LIMIT_MV) && (getValue <= MAX_CHARGING_VOLTAGE_LIMIT_MV));
+    }
+
+    // Fast charging threshold is 2.8 V or 3.0 V
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(2799));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(2800, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(2800));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(2800, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(2801));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(3000, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(3000));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(3000, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(3001));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(3000, getValue);
+    
+    // Recharging threshold is 100 mV or 300 mV
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(99));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(100, getValue);
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(100));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(100, getValue);
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(101));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(300, getValue);
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(300));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(300, getValue);
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(301));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(300, getValue);
+    
+    // Parameters can be NULL
+    TEST_ASSERT(pBatteryCharger->getChargingVoltageLimit(NULL));
+    TEST_ASSERT(pBatteryCharger->getFastChargingVoltageThreshold(NULL));
+    TEST_ASSERT(pBatteryCharger->getRechargingVoltageThreshold(NULL));
+
+    // Put the initial values back when we're done
+    TEST_ASSERT(pBatteryCharger->setChargingVoltageLimit(chargingOriginal));
+    TEST_ASSERT(pBatteryCharger->setFastChargingVoltageThreshold(fastChargingOriginal));
+    TEST_ASSERT(pBatteryCharger->setRechargingVoltageThreshold(rechargingOriginal));
+}
+
+// Test that we can read and change the fast charging safety timer
+void test_fast_charging_safety_timer() {
+    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
+    int32_t timerOriginal;
+    int32_t getValue;
+    
+    // Calls should return false if the battery charger has not been initialised
+    TEST_ASSERT_FALSE(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingSafetyTimer(getValue));
+    
+    // Initialise the battery charger
+    TEST_ASSERT(pBatteryCharger->init(gpI2C));
+    
+    // Save the initial value
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&timerOriginal));
+
+    // Beyond the limit
+    TEST_ASSERT_FALSE(pBatteryCharger->setFastChargingSafetyTimer(-1));
+    
+    // There are permissible values are 0, 5, 8, 12 and 20 so test them and the
+    // boundaries around them
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(0));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(0, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(1));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(5, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(4));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(5, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(6));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(5, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(7));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(5, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(8));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(8, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(11));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(8, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(12));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(12, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(19));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(12, getValue);
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(20));
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(&getValue));
+    TEST_ASSERT_EQUAL_INT32(20, getValue);
+
+    // Parameter can be NULL
+    TEST_ASSERT(pBatteryCharger->getFastChargingSafetyTimer(NULL));
+
+    // Put the initial value back when we're done
+    TEST_ASSERT(pBatteryCharger->setFastChargingSafetyTimer(timerOriginal));
+}
+
+// Test setting the boost mode voltage and temperature limits
+void test_boost_limits() {
+    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
+    int32_t originalVoltage;
+    int32_t originalUpperTemperature;
+    bool upperTemperatureEnabled;
+    int32_t originalLowerTemperature;
+    int32_t setValue;
+    int32_t getValue;
+    
+    // Calls should return false if the battery charger has not been initialised
+    TEST_ASSERT_FALSE(pBatteryCharger->getBoostVoltage(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setBoostVoltage(getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setBoostUpperTemperatureLimit(getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->disableBoostUpperTemperatureLimit());
+    TEST_ASSERT_FALSE(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setBoostLowerTemperatureLimit(getValue));
+    
+    // Initialise the battery charger
+    TEST_ASSERT(pBatteryCharger->init(gpI2C));
+    
+    // Save the initial values
+    TEST_ASSERT(pBatteryCharger->getBoostVoltage(&originalVoltage));
+    upperTemperatureEnabled = pBatteryCharger->isBoostUpperTemperatureLimitEnabled();
+    if (upperTemperatureEnabled) {
+        TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&originalUpperTemperature));
+    }
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&originalLowerTemperature));
+
+    // Beyond the limits for the voltage
+    TEST_ASSERT_FALSE(pBatteryCharger->setBoostVoltage(MIN_BOOST_VOLTAGE_MV - 1));
+    TEST_ASSERT_FALSE(pBatteryCharger->setBoostVoltage(MAX_BOOST_VOLTAGE_MV + 1));
+    
+    // At the limits for the voltage
+    TEST_ASSERT(pBatteryCharger->setBoostVoltage(MIN_BOOST_VOLTAGE_MV));
+    TEST_ASSERT(pBatteryCharger->getBoostVoltage(&getValue));
+    TEST_ASSERT_EQUAL_INT32(MIN_BOOST_VOLTAGE_MV, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostVoltage(MAX_BOOST_VOLTAGE_MV));
+    TEST_ASSERT(pBatteryCharger->getBoostVoltage(&getValue));
+    TEST_ASSERT_EQUAL_INT32(MAX_BOOST_VOLTAGE_MV, getValue);
+    
+    // The voltage read back should be at least the value requested and
+    // not more than 64 mV greater
+    for (uint32_t x = 0; x < NUM_RAND_ITERATIONS; x++) {
+        setValue = MIN_BOOST_VOLTAGE_MV + rand() % (MAX_BOOST_VOLTAGE_MV - MIN_BOOST_VOLTAGE_MV + 1);
+        TEST_ASSERT(pBatteryCharger->setBoostVoltage(setValue));
+        getValue = -1;
+        TEST_ASSERT(pBatteryCharger->getBoostVoltage(&getValue));
+        TEST_ASSERT((getValue < setValue + 64) && (getValue >= setValue));
+        TEST_ASSERT((getValue >= MIN_BOOST_VOLTAGE_MV) && (getValue <= MAX_BOOST_VOLTAGE_MV));
+    }
+
+    // Disable the upper temperature limit and check that the get function returns false
+    TEST_ASSERT(pBatteryCharger->disableBoostUpperTemperatureLimit());
+    TEST_ASSERT_FALSE(pBatteryCharger->isBoostUpperTemperatureLimitEnabled());
+    TEST_ASSERT_FALSE(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    
+    // The boost upper temperature limit is either 55, 60 or 65
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(-1));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(55, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(0));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(55, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(59));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(55, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(60));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(60, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(64));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(60, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(65));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(65, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(100));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(65, getValue);
+    
+    // The boost lower temperature is either -10 or -20
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(1));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-10, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(0));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-10, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(-0));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-10, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(-10));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-10, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(-11));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-20, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(-20));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-20, getValue);
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(-100));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(&getValue));
+    TEST_ASSERT_EQUAL_INT32(-20, getValue);
+    
+    // Parameter can be NULL
+    TEST_ASSERT(pBatteryCharger->getBoostVoltage(NULL));
+    TEST_ASSERT(pBatteryCharger->getBoostUpperTemperatureLimit(NULL));
+    TEST_ASSERT(pBatteryCharger->getBoostLowerTemperatureLimit(NULL));
+
+    // Put the initial values back when we're done
+    TEST_ASSERT(pBatteryCharger->setBoostVoltage(originalVoltage));    
+    if (upperTemperatureEnabled) {
+        TEST_ASSERT(pBatteryCharger->setBoostUpperTemperatureLimit(originalUpperTemperature));
+    } else {
+        TEST_ASSERT(pBatteryCharger->disableBoostUpperTemperatureLimit());
+    }
+    TEST_ASSERT(pBatteryCharger->setBoostLowerTemperatureLimit(originalLowerTemperature));    
+}
+
+// Test setting the chip's thermal regulation threshold
+void test_chip_thermal_regulation_threshold() {
+    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
+    int32_t originalTemperature;
+    int32_t getValue;
+    
+    // Calls should return false if the battery charger has not been initialised
+    TEST_ASSERT_FALSE(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->setChipThermalRegulationThreshold(getValue));
+    
+    // Initialise the battery charger
+    TEST_ASSERT(pBatteryCharger->init(gpI2C));
+    
+    // Save the initial value
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&originalTemperature));
+
+    // The thermal regulation threshold is one of 60C, 80C, 100C or 120C
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(-1));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(60, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(0));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(60, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(79));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(60, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(80));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(80, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(99));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(80, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(100));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(100, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(101));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(100, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(119));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(100, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(120));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(120, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(121));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(120, getValue);
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(200));
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(&getValue));
+    TEST_ASSERT_EQUAL_INT32(120, getValue);
+
+    // Parameter can be NULL
+    TEST_ASSERT(pBatteryCharger->getChipThermalRegulationThreshold(NULL));
+
+    // Put the initial value back when we're done
+    TEST_ASSERT(pBatteryCharger->setChipThermalRegulationThreshold(originalTemperature));    
+}
+
+// Test the advanced functions
+void test_advanced() {
+    BatteryChargerBq24295 * pBatteryCharger = new BatteryChargerBq24295();
+    char originalValue;
+    uint8_t address = 0x03; // REG03, the pre-charge/termination current control register
+    char getValue;
+    int32_t precharge;
+    int32_t termination;
+    
+    // Calls should return false if the battery charger has not been initialised
+    TEST_ASSERT_FALSE(pBatteryCharger->advancedGet(address, &getValue));
+    TEST_ASSERT_FALSE(pBatteryCharger->advancedSet(address, getValue));
+    
+    // Initialise the battery charger
+    TEST_ASSERT(pBatteryCharger->init(gpI2C));
+    
+    // Save the initial value from address
+    TEST_ASSERT(pBatteryCharger->advancedGet(address, &originalValue));
+
+    // REG03 contains the pre-charge current limit in the upper four bits
+    // and the termination current in the lower four bits, so we can read
+    // those and work out what the raw register value is.
+    TEST_ASSERT(pBatteryCharger->getPrechargingCurrentLimit(&precharge));
+    TEST_ASSERT(pBatteryCharger->getChargingTerminationCurrent(&termination));
+    
+    precharge = (precharge - MIN_PRECHARGING_CURRENT_LIMIT_MA) / 128;
+    termination = (termination - MIN_CHARGING_TERMINATION_CURRENT_MA) / 128;
+    TEST_ASSERT_EQUAL_INT8(((precharge << 4) | (termination & 0x0f)), originalValue);
+    
+    // Now write something else to the register and check that it changes
+    TEST_ASSERT(pBatteryCharger->advancedSet(address, 0x01));
+    TEST_ASSERT(pBatteryCharger->advancedGet(address, &getValue));
+    TEST_ASSERT_EQUAL_INT8(0x01, getValue);
+
+    // Parameter can be NULL
+    TEST_ASSERT(pBatteryCharger->advancedGet(address, NULL));
+
+    // Put the initial value back now that we're done
+    TEST_ASSERT(pBatteryCharger->advancedSet(address, originalValue));    
+}
+
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
-    // Setup Greentea using a reasonable timeout in seconds
-    GREENTEA_SETUP(120, "default_auto");
+    // Setup Greentea, timeout is long enough to run these tests with
+    // DEBUG_BQ24295 defined
+    GREENTEA_SETUP(240, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
@@ -542,15 +856,19 @@ Case cases[] = {
     Case("Initialisation", test_init),
     Case("Charger state read", test_charger_state),
     Case("External power presence", test_external_power_present),
-    Case("Charger fault read", test_charger_fault),
+    Case("Charger fault", test_charger_fault),
     Case("Input limits", test_input_limits),
     Case("Charging enable", test_charging_enable),
     Case("System voltage", test_system_voltage),
     Case("Fast charging current limits", test_fast_charging_current_limits),
-    Case("Boost temperature", test_boost_temperature_limit),
     Case("Icgh/Iprech margin", test_icgh_iprech_margin),
     Case("Pre-charging current limits", test_precharging_current_limits),
-    Case("Charging termination current", test_charging_termination_current)
+    Case("Charging termination current", test_charging_termination_current),
+    Case("Charging voltage limits", test_charging_voltage_limits),
+    Case("Fast charging safety timer", test_fast_charging_safety_timer),
+    Case("Boost limits", test_boost_limits),
+    Case("Chip thermal regulation threshold", test_chip_thermal_regulation_threshold),
+    Case("Advanced", test_advanced)
 };
 
 Specification specification(test_setup, cases);
@@ -559,6 +877,7 @@ Specification specification(test_setup, cases);
 int main() {    
     bool success = false;
     
+    srand(time(NULL));
     if (gpI2C != NULL) {        
         success = !Harness::run(specification);
     } else {

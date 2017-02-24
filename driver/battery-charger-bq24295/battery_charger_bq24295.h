@@ -48,18 +48,18 @@ public:
         MAX_NUM_CHARGER_STATES
     } ChargerState;
 
-    /// Charger faults
+    /// Charger faults as a bitmap that matches the chip REG09 definitions
     typedef enum {
-        CHARGER_FAULT_UNKNOWN,
-        CHARGER_FAULT_NONE,
-        CHARGER_FAULT_INPUT_FAULT,
-        CHARGER_FAULT_THERMAL_SHUTDOWN,
-        CHARGER_FAULT_CHARGE_TIMER_EXPIRED,
-        CHARGER_FAULT_BATTERY_OVER_VOLTAGE,
-        CHARGER_FAULT_THERMISTOR_TOO_COLD,
-        CHARGER_FAULT_THERMISTOR_TOO_HOT,
-        CHARGER_FAULT_WATCHDOG_EXPIRED,
-        CHARGER_FAULT_BOOST,
+        CHARGER_FAULT_NONE = 0x00,
+        CHARGER_FAULT_THERMISTOR_TOO_HOT = 0x01,
+        CHARGER_FAULT_THERMISTOR_TOO_COLD = 0x02,
+        // Value 0x04 is reserved
+        CHARGER_FAULT_BATTERY_OVER_VOLTAGE = 0x08,
+        CHARGER_FAULT_INPUT_FAULT = 0x10,
+        CHARGER_FAULT_THERMAL_SHUTDOWN = 0x20,
+        CHARGER_FAULT_CHARGE_TIMER_EXPIRED = 0x30, // Looks odd bit it matches the register meaning
+        CHARGER_FAULT_OTG = 0x40,
+        CHARGER_FAULT_WATCHDOG_EXPIRED = 0x80,
         MAX_NUM_CHARGER_FAULTS
     } ChargerFault;
 
@@ -81,16 +81,6 @@ public:
     /// Get whether external power is present or not.
     // \return true if external power is present, otherwise false.
     bool isExternalPowerPresent(void);
-
-    /// Read the temperature of the battery.
-    // \param pTemperatureC place to put the temperature reading.
-    // \return true if successful, otherwise false.
-    bool getBatteryTemperature (int32_t *pTemperatureC);
-
-    /// Read the temperature of the BQ24295 chip.
-    // \param pTemperatureC place to put the temperature reading.
-    // \return true if successful, otherwise false.
-    bool getChipTemperature (int32_t *pTemperatureC);
 
     /// Enable charging.
     // \return true if successful, otherwise false.
@@ -117,9 +107,9 @@ public:
     bool isOtgEnabled (void);
 
     /// Set the system voltage (the voltage which the
-    // chip will attempt to maintain the system at if both
-    // external and internal power are present).
+    // chip will attempt to maintain the system at).
     // \param voltageMV the voltage limit, in milliVolts.
+    //        Range is 3000 mV to 3700 mV.
     // \return true if successful, otherwise false.
     bool setSystemVoltage (int32_t voltageMV);
 
@@ -130,6 +120,7 @@ public:
 
     /// Set the fast charging current limit.
     // \param currentMA the fast charging current limit, in milliAmps.
+    //        Range is 512 mA to 3008 mA.
     // \return true if successful, otherwise false.
     bool setFastChargingCurrentLimit (int32_t currentMA);
 
@@ -141,10 +132,12 @@ public:
     /// Set the fast charging safety timer.
     // \param timerHours the charging safety timer value.
     //        Use a value of 0 to indicate that the timer should be disabled.
+    //        Timer values will be translated to the nearest (lower) value
+    //        out of 5, 8, 12, and 20 hours.
     // \return true if successful, otherwise false.
     bool setFastChargingSafetyTimer (int32_t timerHours);
 
-    /// Get the fast charging safety timer value (in hours).
+    /// Get the fast charging safety timer value.
     // \param pTimerHours a place to put the charging safety timer value.
     //        Returned value is zero if the fast charging safety timer is disabled.
     // \return true if charging termination is enabled, otherwise false.
@@ -165,6 +158,7 @@ public:
     
     /// Set the charging termination current.
     // \param currentMA the charging termination current, in milliAmps.
+    //        Range is 128 mA to 2048 mA.
     // \return true if successful, otherwise false.
     bool setChargingTerminationCurrent (int32_t currentMA);
 
@@ -195,8 +189,44 @@ public:
     // \return true if successful, otherwise false.
     bool getPrechargingCurrentLimit (int32_t *pCurrentMA);
 
+    /// Set the charging voltage limit.
+    // \param voltageMV the charging voltage limit, in milliVolts.
+    // \return true if successful, otherwise false.
+    bool setChargingVoltageLimit (int32_t voltageMV);
+
+    /// Get the charging voltage limit.
+    // \param pVoltageMV a place to put the charging voltage limit,
+    //        in milliVolts.  Range is 3504 mV to 4400 mV.
+    // \return true if successful, otherwise false.
+    bool getChargingVoltageLimit (int32_t *pVoltageMV);
+
+    /// Set the pre-charge to fast-charge voltage threshold.
+    // \param voltageMV the threshold, in milliVolts.
+    //        Values will be translated to the nearest (highest)
+    //        voltage out of 2800 mV and 3000 mV.
+    // \return true if successful, otherwise false.
+    bool setFastChargingVoltageThreshold (int32_t voltageMV);
+
+    /// Get the pre-charge to fast-charge voltage threshold.
+    // \param pVoltageMV a place to put the threshold, in milliVolts.
+    // \return true if successful, otherwise false.
+    bool getFastChargingVoltageThreshold (int32_t *pVoltageMV);
+
+    /// Set the recharging voltage threshold.
+    // \param voltageMV the recharging voltage threshold, in milliVolts.
+    //        Values will be translated to the nearest (highest)
+    //        voltage out of 100 mV and 300 mV.
+    // \return true if successful, otherwise false.
+    bool setRechargingVoltageThreshold (int32_t voltageMV);
+
+    /// Get the recharging voltage threshold.
+    // \param pVoltageMV a place to put the charging voltage threshold, in milliVolts.
+    // \return true if successful, otherwise false.
+    bool getRechargingVoltageThreshold (int32_t *pVoltageMV);
+
     /// Set the boost voltage.
     // \param voltageMV the boost voltage, in milliVolts.
+    //        Range is 4550 mV to 5510 mV.
     // \return true if successful, otherwise false.
     bool setBoostVoltage (int32_t voltageMV);
 
@@ -205,8 +235,33 @@ public:
     // \return true if successful, otherwise false.
     bool getBoostVoltage (int32_t *pVoltageMV);
 
+    /// Set the boost mode upper temperature limit.
+    // \param temperatureC the temperature in C.
+    //        Values will be translated to the nearest (lower)
+    //        of 55 C, 60 C and 65 C.
+    // \return true if successful, otherwise false.
+    bool setBoostUpperTemperatureLimit (int32_t temperatureC);
+
+    /// Get the boost mode upper temperature limit.
+    // If the boost mode upper temperature limit is not
+    // enabled then pTemperatureC will remain untouched and false
+    // will be returned.
+    // \param pTemperatureC a place to put the temperature.
+    // \return true if successful and a limit was set, otherwise false.
+    bool getBoostUpperTemperatureLimit (int32_t *pTemperatureC);
+    
+    /// Check whether the boost mode upper temperature limit is enabled.
+    // \return true if successful, otherwise false.
+    bool isBoostUpperTemperatureLimitEnabled (void);
+
+    /// Disable the boost mode upper temperature limit.
+    // \return true if successful, otherwise false.
+    bool disableBoostUpperTemperatureLimit (void);
+
     /// Set the boost mode low temperature limit.
     // \param temperatureC the temperature in C.
+    //        Values will be translated to the nearest (higher)
+    //        of -10 C and -20 C.
     // \return true if successful, otherwise false.
     bool setBoostLowerTemperatureLimit (int32_t temperatureC);
 
@@ -219,8 +274,7 @@ public:
     // this level then charging will be ramped down.  The limit
     // does not take effect until enableInputLimits() is called.
     // \param voltageMV the input voltage limit, in milliVolts.
-    //        A value of 0 will be ignored, use clearInputLimits()
-    //        instead.
+    //        Range is 3880 mV to 5080 mV.
     // \return true if successful, otherwise false.
     bool setInputVoltageLimit (int32_t voltageMV);
 
@@ -234,8 +288,7 @@ public:
     // The limit does not take effect until enableInputLimits()
     // is called.
     // \param currentMA the input current limit, in milliAmps.
-    //        A value of 0 will be ignored, use clearInputLimits()
-    //        instead.
+    //        Range is 100 mA to 3000 mA.
     // \return true if successful, otherwise false.
     bool setInputCurrentLimit (int32_t currentMA);
 
@@ -256,42 +309,25 @@ public:
     // \return true if input limits are enabled, otherwise false.
     bool areInputLimitsEnabled (void);
 
-    /// Set the charging voltage limit.
-    // \param voltageMV the charging voltage limit, in milliVolts.
+    /// Set the thermal regulation threshold for the chip.
+    // \param temperatureC the temperature in C.
+    //        Values will be translated to the nearest (lower)
+    //        of 60 C, 80 C, 100 C and 120 C.
     // \return true if successful, otherwise false.
-    bool setChargingVoltageLimit (int32_t voltageMV);
+    bool setChipThermalRegulationThreshold (int32_t temperatureC);
 
-    /// Get the charging voltage limit.
-    // \param pVoltageMV a place to put the charging voltage limit, in milliVolts.
+    /// Get the thermal regulation threshold for the chip.
+    // \param pTemperatureC a place to put the temperature.
     // \return true if successful, otherwise false.
-    bool getChargingVoltageLimit (int32_t *pVoltageMV);
-
-    /// Set the recharging voltage threshold.
-    // \param voltageMV the recharging voltage threshold, in milliVolts.
-    // \return true if successful, otherwise false.
-    bool setRechargingVoltageThreshold (int32_t voltageMV);
-
-    /// Get the recharging voltage threshold.
-    // \param pVoltageMV a place to put the charging voltage threshold, in milliVolts.
-    // \return true if successful, otherwise false.
-    bool getRechargingVoltageThreshold (int32_t *pVoltageMV);
-
-    /// Enable shipping mode (lowest possible power state).
-    // \return true if successful, otherwise false.
-    bool setShippingMode(void);
-
-    /// Get the charger fault status.
-    // \return the charger fault status.
-    ChargerFault getChargerFault(void);
+    bool getChipThermalRegulationThreshold (int32_t *pTemperatureC);
     
-    /// Get the reason(s) for an interrupt occurring.
+    /// Get the charger faults.
     // Note: as with all the other API functions here, this should
     // not be called from an interrupt function as the comms with the
     // chip over I2C will take too long.
-    // \return a bit-map containing the Int reasons that
-    //         can be tested against the values of the Int enum.
-    char getIntReason (void);
-        
+    // \return a bit-map of that can be tested against ChargerFault.
+    char getChargerFaults(void);
+    
     /// Advanced function to read a register on the chip.
     // \param address the address to read from.
     // \param pValue a place to put the returned value.

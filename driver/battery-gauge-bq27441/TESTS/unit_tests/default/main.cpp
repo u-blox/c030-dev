@@ -533,7 +533,8 @@ void test_advanced_reset() {
 
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
-    // Setup Greentea using a reasonable timeout in seconds
+    // Setup Greentea, timeout is long enough to run these tests with
+    // DEBUG_BQ27441 defined
     // Note: timeout is quite long as the chip has 4 second
     // timeouts in quite a lot of cases.
     GREENTEA_SETUP(480, "default_auto");

@@ -710,7 +710,8 @@ void test_charge_low() {
 
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
-    // Setup Greentea using a reasonable timeout in seconds
+    // Setup Greentea, timeout is long enough to run these tests with
+    // DEBUG_LTC2943 defined
     GREENTEA_SETUP(20, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }

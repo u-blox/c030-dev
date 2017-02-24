@@ -55,8 +55,8 @@ public:
         CHARGER_FAULT_THERMISTOR_TOO_COLD = 0x02,
         // Value 0x04 is reserved
         CHARGER_FAULT_BATTERY_OVER_VOLTAGE = 0x08,
-        CHARGER_FAULT_INPUT_FAULT = 0x10,
-        CHARGER_FAULT_THERMAL_SHUTDOWN = 0x20,
+        CHARGER_FAULT_INPUT_FAULT = 0x10,          // Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this
+        CHARGER_FAULT_THERMAL_SHUTDOWN = 0x20,     // Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this
         CHARGER_FAULT_CHARGE_TIMER_EXPIRED = 0x30, // Looks odd bit it matches the register meaning
         CHARGER_FAULT_OTG = 0x40,
         CHARGER_FAULT_WATCHDOG_EXPIRED = 0x80,
@@ -102,7 +102,7 @@ public:
     // \return true if successful, otherwise false.
     bool disableOtg (void);
 
-    /// Get whether OTG charging is enabeld or not.
+    /// Determine whether OTG charging is enabled or not.
     // \return true if OTG charging is enabled, otherwise false.
     bool isOtgEnabled (void);
 
@@ -143,16 +143,16 @@ public:
     // \return true if charging termination is enabled, otherwise false.
     bool getFastChargingSafetyTimer (int32_t *pTimerHours);
 
-    /// Set ICHG/IPRECH margin (see section 8.3.3.5 of data sheet).
+    /// Set ICHG/IPRECH margin (see section 8.3.3.5 of the chip data sheet).
     // \return true if successful, otherwise false.
     bool enableIcghIprechMargin (void);
 
-    /// Clear the ICHG/IPRECH margin (see section 8.3.3.5 of data sheet).
+    /// Clear the ICHG/IPRECH margin (see section 8.3.3.5 of the chip data sheet).
     // \return true if successful, otherwise false.
     bool disableIcghIprechMargin (void);
     
     /// Check if the ICHG/IPRECH margin is set (see section 8.3.3.5 of
-    //  data sheet).
+    //  the chip data sheet).
     // \return true if the ICHG/IPRECH margin is enabled, otherwise false.
     bool isIcghIprechMarginEnabled (void);
     

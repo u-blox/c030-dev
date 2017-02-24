@@ -92,22 +92,6 @@ public:
     // \return true if successful, otherwise false.
     bool getChipTemperature (int32_t *pTemperatureC);
 
-    /// Get the charger fault status.
-    // \return the charger fault status.
-    ChargerFault getChargerFault(void);
-    
-    /// Enable OTG charging.
-    // \return true if successful, otherwise false.
-    bool enableOtg (void);
-
-    /// Disable OTG charging.
-    // \return true if successful, otherwise false.
-    bool disableOtg (void);
-
-    /// Get whether OTG charging is enabeld or not.
-    // \return true if OTG charging is enabled, otherwise false.
-    bool isOtgEnabled (void);
-
     /// Enable charging.
     // \return true if successful, otherwise false.
     bool enableCharging (void);
@@ -119,6 +103,18 @@ public:
     /// Get the state of charging (enabled or disabled).
     // \return true if charging is enabled, otherwise false.
     bool isChargingEnabled (void);
+
+    /// Enable OTG charging.
+    // \return true if successful, otherwise false.
+    bool enableOtg (void);
+
+    /// Disable OTG charging.
+    // \return true if successful, otherwise false.
+    bool disableOtg (void);
+
+    /// Get whether OTG charging is enabeld or not.
+    // \return true if OTG charging is enabled, otherwise false.
+    bool isOtgEnabled (void);
 
     /// Set the system voltage (the voltage which the
     // chip will attempt to maintain the system at if both
@@ -132,6 +128,93 @@ public:
     // \return true if successful, otherwise false.
     bool getSystemVoltage (int32_t *pVoltageMV);
 
+    /// Set the fast charging current limit.
+    // \param currentMA the fast charging current limit, in milliAmps.
+    // \return true if successful, otherwise false.
+    bool setFastChargingCurrentLimit (int32_t currentMA);
+
+    /// Get the fast charging current limit.
+    // \param pCurrentMA a place to put the fast charging current limit.
+    // \return true if successful, otherwise false.
+    bool getFastChargingCurrentLimit (int32_t *pCurrentMA);
+
+    /// Set the fast charging safety timer.
+    // \param timerHours the charging safety timer value.
+    //        Use a value of 0 to indicate that the timer should be disabled.
+    // \return true if successful, otherwise false.
+    bool setFastChargingSafetyTimer (int32_t timerHours);
+
+    /// Get the fast charging safety timer value (in hours).
+    // \param pTimerHours a place to put the charging safety timer value.
+    //        Returned value is zero if the fast charging safety timer is disabled.
+    // \return true if charging termination is enabled, otherwise false.
+    bool getFastChargingSafetyTimer (int32_t *pTimerHours);
+
+    /// Set ICHG/IPRECH margin (see section 8.3.3.5 of data sheet).
+    // \return true if successful, otherwise false.
+    bool enableIcghIprechMargin (void);
+
+    /// Clear the ICHG/IPRECH margin (see section 8.3.3.5 of data sheet).
+    // \return true if successful, otherwise false.
+    bool disableIcghIprechMargin (void);
+    
+    /// Check if the ICHG/IPRECH margin is set (see section 8.3.3.5 of
+    //  data sheet).
+    // \return true if the ICHG/IPRECH margin is enabled, otherwise false.
+    bool isIcghIprechMarginEnabled (void);
+    
+    /// Set the charging termination current.
+    // \param currentMA the charging termination current, in milliAmps.
+    // \return true if successful, otherwise false.
+    bool setChargingTerminationCurrent (int32_t currentMA);
+
+    /// Get the charging termination current.
+    // \param pCurrentMA a place to put the charging termination current.
+    // \return true if successful, otherwise false.
+    bool getChargingTerminationCurrent (int32_t *pCurrentMA);
+
+    /// Enable charging termination.
+    // \return true if successful, otherwise false.
+    bool enableChargingTermination (void);
+
+    /// Disable charging termination.
+    // \return true if successful, otherwise false.
+    bool disableChargingTermination (void);
+
+    /// Get the state of charging termination (enabled or disabled).
+    // \return true if charging termination is enabled, otherwise false.
+    bool isChargingTerminationEnabled (void);
+
+    /// Set the pre-charging current limit.
+    // \param currentMA the pre-charging current limit, in milliAmps.
+    // \return true if successful, otherwise false.
+    bool setPrechargingCurrentLimit (int32_t currentMA);
+
+    /// Get the pre-charging current limit.
+    // \param pCurrentMA a place to put the pre-charging current limit.
+    // \return true if successful, otherwise false.
+    bool getPrechargingCurrentLimit (int32_t *pCurrentMA);
+
+    /// Set the boost voltage.
+    // \param voltageMV the boost voltage, in milliVolts.
+    // \return true if successful, otherwise false.
+    bool setBoostVoltage (int32_t voltageMV);
+
+    /// Get the boost voltage.
+    // \param pVoltageMV a place to put the boost voltage, in milliVolts.
+    // \return true if successful, otherwise false.
+    bool getBoostVoltage (int32_t *pVoltageMV);
+
+    /// Set the boost mode low temperature limit.
+    // \param temperatureC the temperature in C.
+    // \return true if successful, otherwise false.
+    bool setBoostLowerTemperatureLimit (int32_t temperatureC);
+
+    /// Get the boost mode low temperature limit.
+    // \param pTemperatureC a place to put the temperature.
+    // \return true if successful, otherwise false.
+    bool getBoostLowerTemperatureLimit (int32_t *pTemperatureC);
+    
     /// Set the input voltage limit.  If the input falls below
     // this level then charging will be ramped down.  The limit
     // does not take effect until enableInputLimits() is called.
@@ -193,77 +276,14 @@ public:
     // \return true if successful, otherwise false.
     bool getRechargingVoltageThreshold (int32_t *pVoltageMV);
 
-    /// Set the fast charging current limit.
-    // \param currentMA the fast charging current limit, in milliAmps.
-    // \return true if successful, otherwise false.
-    bool setFastChargingCurrentLimit (int32_t currentMA);
-
-    /// Get the fast charging current limit.
-    // \param pCurrentMA a place to put the fast charging current limit.
-    // \return true if successful, otherwise false.
-    bool getFastChargingCurrentLimit (int32_t *pCurrentMA);
-
-    /// Set the pre-charging current limit.
-    // \param currentMA the pre-charging current limit, in milliAmps.
-    // \return true if successful, otherwise false.
-    bool setPrechargingCurrentLimit (int32_t currentMA);
-
-    /// Get the pre-charging current limit.
-    // \param pCurrentMA a place to put the pre-charging current limit.
-    // \return true if successful, otherwise false.
-    bool getPrechargingCurrentLimit (int32_t *pCurrentMA);
-
-    /// Set the charging termination current limit.
-    // \param currentMA the charging termination current limit, in milliAmps.
-    // \return true if successful, otherwise false.
-    bool setChargingTerminationCurrentLimit (int32_t currentMA);
-
-    /// Get the charging termination current limit.
-    // \param pCurrentMA a place to put the charging termination current limit.
-    // \return true if successful, otherwise false.
-    bool getChargingTerminationCurrentLimit (int32_t *pCurrentMA);
-
-    /// Enable charging termination.
-    // \return true if successful, otherwise false.
-    bool enableChargingTermination (void);
-
-    /// Disable charging termination.
-    // \return true if successful, otherwise false.
-    bool disableChargingTermination (void);
-
-    /// Get the state of charging termination (enabled or disabled).
-    // \return true if charging termination is enabled, otherwise false.
-    bool isChargingTerminationEnabled (void);
-
-    /// Set the boost voltage.
-    // \param voltageMV the boost voltage, in milliVolts.
-    // \return true if successful, otherwise false.
-    bool setBoostVoltage (int32_t voltageMV);
-
-    /// Get the boost voltage.
-    // \param pVoltageMV a place to put the boost voltage, in milliVolts.
-    // \return true if successful, otherwise false.
-    bool getBoostVoltage (int32_t *pVoltageMV);
-
-    // TODO: make sense of the thermal regulation stuff (in current and voltage.
-    // TODO: make sense of FORCE_20PCT.
-    
-    /// Set the fast charging safety timer.
-    // \param timerHours the charging safety timer value.
-    //        Use a value of 0 to indicate that the timer should be disabled.
-    // \return true if successful, otherwise false.
-    bool setFastChargingSafetyTimer (int32_t timerHours);
-
-    /// Get the fast charging safety timer value (in hours).
-    // \param pTimerHours a place to put the charging safety timer value.
-    //        Returned value is zero if the fast charging safety timer is disabled.
-    // \return true if charging termination is enabled, otherwise false.
-    bool getFastChargingSafetyTimer (int32_t *pTimerHours);
-
     /// Enable shipping mode (lowest possible power state).
     // \return true if successful, otherwise false.
     bool setShippingMode(void);
 
+    /// Get the charger fault status.
+    // \return the charger fault status.
+    ChargerFault getChargerFault(void);
+    
     /// Get the reason(s) for an interrupt occurring.
     // Note: as with all the other API functions here, this should
     // not be called from an interrupt function as the comms with the
@@ -272,6 +292,18 @@ public:
     //         can be tested against the values of the Int enum.
     char getIntReason (void);
         
+    /// Advanced function to read a register on the chip.
+    // \param address the address to read from.
+    // \param pValue a place to put the returned value.
+    // \return true if successful, otherwise false.
+    bool advancedGet(char address, char *pValue);
+
+    /// Advanced function to set a register on the chip.
+    // \param address the address to write to.
+    // \param value the value to write.
+    // \return true if successful, otherwise false.
+    bool advancedSet(char address, char value);
+
 protected:
     /// Pointer to the I2C interface.
     I2C * gpI2c;

@@ -282,71 +282,72 @@ bool BatteryChargerBq24295::getChipTemperature (int32_t *pTemperatureC)
     return success;
 }
 
-/// Get the charger fault status.
-BatteryChargerBq24295::ChargerFault BatteryChargerBq24295::getChargerFault(void)
+/// Enable charging.
+bool BatteryChargerBq24295::enableCharging (void)
 {
-    BatteryChargerBq24295::ChargerFault chargerFault = CHARGER_FAULT_UNKNOWN;
-    char reg;
+    bool success = false;
 
     if (gReady && (gpI2c != NULL)) {
         gpI2c->lock();
-        // Read the fault register
-        if (getRegister(0x09, &reg)) {
-            chargerFault = CHARGER_FAULT_NONE;
-            if ((reg & (1 << 8)) != 0) {
-                chargerFault = CHARGER_FAULT_WATCHDOG_EXPIRED;
+        // Charge enable is bit 4 of the power-on configuration register
+        success = setRegisterBits(0x01, (1 << 4));
 #ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): watchdog expired.\r\n", gAddress >> 1);
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now ENABLED.\r\n", gAddress >> 1);
+        }
 #endif
-            } else if ((reg & (1 << 7)) != 0) {
-                chargerFault = CHARGER_FAULT_BOOST;
+        gpI2c->unlock();
+    }
+    
+    return success;
+}
+
+/// Disable charging.
+bool BatteryChargerBq24295::disableCharging (void)
+{
+    bool success = false;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Charge enable is bit 4 of the power-on configuration register
+        success = clearRegisterBits(0x01, (1 << 4));
 #ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): boost fault.\r\n", gAddress >> 1);
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now DISABLED.\r\n", gAddress >> 1);
+        }
 #endif
-            } else if ((reg & 0x30) != 0) {
-                switch ((reg >> 4) & 0x03) {
-                    case 1:
-                        chargerFault = CHARGER_FAULT_INPUT_FAULT;
-#ifdef DEBUG_BQ24295
-                        printf("BatteryChargerBq24295 (I2C 0x%02x): input fault.\r\n", gAddress >> 1);
-#endif
-                    break;
-                    case 2:
-                        chargerFault = CHARGER_FAULT_THERMAL_SHUTDOWN;
-#ifdef DEBUG_BQ24295
-                        printf("BatteryChargerBq24295 (I2C 0x%02x): thermal shutdown.\r\n", gAddress >> 1);
-#endif
-                    break;
-                    case 3:
-                        chargerFault = CHARGER_FAULT_CHARGE_TIMER_EXPIRED;
-#ifdef DEBUG_BQ24295
-                        printf("BatteryChargerBq24295 (I2C 0x%02x): charge timer expired.\r\n", gAddress >> 1);
-#endif
-                    break;
-                    default:
-                    break;
-                }
-            } else if ((reg & (1 << 3)) != 0) {
-                chargerFault = CHARGER_FAULT_BATTERY_OVER_VOLTAGE;
-#ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): battery over-voltage fault.\r\n", gAddress >> 1);
-#endif
-            } else if ((reg & (1 << 1)) != 0) {
-                chargerFault = CHARGER_FAULT_THERMISTOR_TOO_COLD;
-#ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): thermistor too cold.\r\n", gAddress >> 1);
-#endif
-            } else if ((reg & (1 << 0)) != 0) {
-                chargerFault = CHARGER_FAULT_THERMISTOR_TOO_HOT;
-#ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): thermistor too hot.\r\n", gAddress >> 1);
-#endif
+        gpI2c->unlock();
+    }
+    
+    return success;
+}
+
+/// Get the whether charging is enabled or disabled.
+bool BatteryChargerBq24295::isChargingEnabled (void)
+{
+    bool isEnabled = false;
+    char reg;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the power-on configuration register
+        if (getRegister(0x01, &reg)) {
+            // Charge enable is bit 4 of the power-on configuration register
+            if ((reg & (1 << 4)) != 0) {
+                isEnabled = true;
             }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
         }
         gpI2c->unlock();
     }
-
-    return chargerFault;
+    
+    return isEnabled;
 }
 
 /// Enable OTG charging.
@@ -417,74 +418,6 @@ bool BatteryChargerBq24295::isOtgEnabled (void)
     return isEnabled;
 }
 
-/// Enable charging.
-bool BatteryChargerBq24295::enableCharging (void)
-{
-    bool success = false;
-
-    if (gReady && (gpI2c != NULL)) {
-        gpI2c->lock();
-        // Charge enable is bit 4 of the power-on configuration register
-        success = setRegisterBits(0x01, (1 << 4));
-#ifdef DEBUG_BQ24295
-        if (success) {
-            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now ENABLED.\r\n", gAddress >> 1);
-        }
-#endif
-        gpI2c->unlock();
-    }
-    
-    return success;
-}
-
-/// Disable charging.
-bool BatteryChargerBq24295::disableCharging (void)
-{
-    bool success = false;
-    
-    if (gReady && (gpI2c != NULL)) {
-        gpI2c->lock();
-        // Charge enable is bit 4 of the power-on configuration register
-        success = clearRegisterBits(0x01, (1 << 4));
-#ifdef DEBUG_BQ24295
-        if (success) {
-            printf("BatteryChargerBq24295 (I2C 0x%02x): charging now DISABLED.\r\n", gAddress >> 1);
-        }
-#endif
-        gpI2c->unlock();
-    }
-    
-    return success;
-}
-
-/// Get the whether charging is enabled or disabled.
-bool BatteryChargerBq24295::isChargingEnabled (void)
-{
-    bool isEnabled = false;
-    char reg;
-    
-    if (gReady && (gpI2c != NULL)) {
-        gpI2c->lock();
-        // Read the power-on configuration register
-        if (getRegister(0x01, &reg)) {
-            // Charge enable is bit 4 of the power-on configuration register
-            if ((reg & (1 << 4)) != 0) {
-                isEnabled = true;
-            }
-#ifdef DEBUG_BQ24295
-            if (isEnabled) {
-                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is ENABLED.\r\n", gAddress >> 1);
-            } else {
-                printf("BatteryChargerBq24295 (I2C 0x%02x): charging is DISABLED.\r\n", gAddress >> 1);
-            }
-#endif
-        }
-        gpI2c->unlock();
-    }
-    
-    return isEnabled;
-}
-
 /// Set the system voltage.
 bool BatteryChargerBq24295::setSystemVoltage (int32_t voltageMV)
 {
@@ -513,6 +446,7 @@ bool BatteryChargerBq24295::setSystemVoltage (int32_t voltageMV)
                 reg &= ~(0x07 << 1);
                 reg |= (char) codedValue;
                 
+                // Write to the power-on configuration register
                 success = setRegister (0x01, reg);
 #ifdef DEBUG_BQ24295
                 if (success) {
@@ -557,6 +491,440 @@ bool BatteryChargerBq24295::getSystemVoltage (int32_t *pVoltageMV)
     return success;
 }
 
+/// Set the fast charging current limit.
+bool BatteryChargerBq24295::setFastChargingCurrentLimit (int32_t currentMA)
+{
+    bool success = false;
+    char reg;
+    int32_t codedValue;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge current control register
+        if (getRegister(0x02, &reg)) {
+            // Fast charging current limit is in
+            // bits 2 to 7, coded to base "64 mA" with
+            // an offset of 512 mA.
+            if ((currentMA >= 512) && (currentMA <= 3008)) {
+                codedValue = currentMA;
+                codedValue = (codedValue - 512) / 64;
+                codedValue = (codedValue & 0x3f) << 2;
+                
+                reg &= ~(0x3f << 2);
+                reg |= (char) codedValue;
+
+                // Write to the charge current control register
+                success = setRegister (0x02, reg);
+#ifdef DEBUG_BQ24295
+                if (success) {
+                    printf("BatteryChargerBq24295 (I2C 0x%02x): fast charging current limit set to %.3f A.\r\n", gAddress >> 1, (float) currentMA / 1000);
+                }
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Get the fast charging current limit.
+bool BatteryChargerBq24295::getFastChargingCurrentLimit (int32_t *pCurrentMA)
+{
+    bool success = false;
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge current control register
+        if (getRegister(0x02, &reg)) {
+            success = true;
+            if (pCurrentMA != NULL) {
+                // Fast charging current limit is in bits 2 to 7
+                // Base current
+                *pCurrentMA = 512;
+                // Shift reg down and add the number of multiples
+                // of 64 mA
+                reg = (reg >> 2) & 0x3f;
+                *pCurrentMA += ((int32_t) reg) * 64;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): fast charge current limit is %.3f A.\r\n", gAddress >> 1, (float) *pCurrentMA / 1000);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Enable the ICHG/IPRECH margin.
+bool BatteryChargerBq24295::enableIcghIprechMargin (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // FORCE_20PCT is bit 0 of the charge current control register
+        success = setRegisterBits(0x02, (1 << 0));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): ICGH/IPRECH margin now ENABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Disable the ICHG/IPRECH margin.
+bool BatteryChargerBq24295::disableIcghIprechMargin (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // FORCE_20PCT is bit 0 of the charge current control register
+        success = clearRegisterBits(0x02, (1 << 0));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): ICGH/IPRECH margin now DISABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Check if the ICHG/IPRECH margin is set.
+bool BatteryChargerBq24295::isIcghIprechMarginEnabled (void)
+{
+    bool isEnabled = false;
+    char reg;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge current control register
+        if (getRegister(0x02, &reg)) {
+            // FORCE_20PCT is bit 0
+            if ((reg & (1 << 0)) != 0) {
+                isEnabled = true;
+            }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): ICGH/IPRECH margin is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): ICGH/IPRECH margin is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return isEnabled;
+}
+    
+/// Set the fast charging safety timer.
+bool BatteryChargerBq24295::setFastChargingSafetyTimer (int32_t timerHours)
+{
+    bool success = false;
+    
+    // TODO
+    
+    return success;
+}
+
+/// Get the value of the fast charging safety timer.
+bool BatteryChargerBq24295::getFastChargingSafetyTimer (int32_t *pTimerHours)
+{
+    bool success = false;
+    
+    // TODO
+    
+    return success;
+}
+
+/// Set the charging termination current.
+bool BatteryChargerBq24295::setChargingTerminationCurrent (int32_t currentMA)
+{
+    bool success = false;
+    char reg;
+    int32_t codedValue;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the pre-charge/termination current control register
+        if (getRegister(0x03, &reg)) {
+            // Charging termination current limit is in
+            // bits 0 to 3, coded to base "128 mA" with
+            // an offset of 128 mA.
+            if ((currentMA >= 128) && (currentMA <= 2048)) {
+                codedValue = currentMA;
+                codedValue = (codedValue - 128) / 128;
+                codedValue = codedValue & 0x0f;
+                
+                reg &= ~0x0f;
+                reg |= (char) codedValue;
+
+                // Write to the pre-charge/termination current control register
+                success = setRegister (0x03, reg);
+#ifdef DEBUG_BQ24295
+                if (success) {
+                    printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination current set to %.3f A.\r\n", gAddress >> 1, (float) currentMA / 1000);
+                }
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Get the charging termination current.
+bool BatteryChargerBq24295::getChargingTerminationCurrent (int32_t *pCurrentMA)
+{
+    bool success = false;
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the pre-charge/termination current control register
+        if (getRegister(0x03, &reg)) {
+            success = true;
+            if (pCurrentMA != NULL) {
+                // Pre-charging current limit is in bits 0 to 3
+                // Base current
+                *pCurrentMA = 128;
+                // Add the number of multiples of 128 mA
+                reg = reg & 0x0f;
+                *pCurrentMA += ((int32_t) reg) * 128;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination current is %.3f A.\r\n", gAddress >> 1, (float) *pCurrentMA / 1000);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Enable charging termination.
+bool BatteryChargerBq24295::enableChargingTermination (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // EN_TERM is bit 7 of the charge termination/timer control register
+        success = setRegisterBits(0x05, (1 << 7));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination now ENABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Disable charging termination.
+bool BatteryChargerBq24295::disableChargingTermination (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // EN_TERM is bit 7 of the charge termination/timer control register
+        success = clearRegisterBits(0x05, (1 << 7));
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination now DISABLED.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Get the state of charging termination (enabled or disabled)
+bool BatteryChargerBq24295::isChargingTerminationEnabled (void)
+{
+    bool isEnabled = false;
+    char reg;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the charge termination/timer control register
+        if (getRegister(0x05, &reg)) {
+            // EN_TERM is bit 7
+            if ((reg & (1 << 7)) != 0) {
+                isEnabled = true;
+            }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): charging termination is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return isEnabled;
+}
+
+/// Set the pre-charging current limit.
+bool BatteryChargerBq24295::setPrechargingCurrentLimit (int32_t currentMA)
+{
+    bool success = false;
+    char reg;
+    int32_t codedValue;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the pre-charge/termination current control register
+        if (getRegister(0x03, &reg)) {
+            // Pre-charging current limit is in
+            // bits 4 to 7, coded to base "128 mA" with
+            // an offset of 128 mA.
+            if ((currentMA >= 128) && (currentMA <= 2048)) {
+                codedValue = currentMA;
+                codedValue = (codedValue - 128) / 128;
+                codedValue = (codedValue & 0x0f) << 4;
+                
+                reg &= ~(0x0f << 4);
+                reg |= (char) codedValue;
+
+                // Write to the pre-charge/termination current control register
+                success = setRegister (0x03, reg);
+#ifdef DEBUG_BQ24295
+                if (success) {
+                    printf("BatteryChargerBq24295 (I2C 0x%02x): pre-charging current limit set to %.3f A.\r\n", gAddress >> 1, (float) currentMA / 1000);
+                }
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Get the pre-charging current limit.
+bool BatteryChargerBq24295::getPrechargingCurrentLimit (int32_t *pCurrentMA)
+{
+    bool success = false;
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the pre-charge/termination current control register
+        if (getRegister(0x03, &reg)) {
+            success = true;
+            if (pCurrentMA != NULL) {
+                // Pre-charging current limit is in bits 4 to 7
+                // Base current
+                *pCurrentMA = 128;
+                // Shift reg down and add the number of multiples
+                // of 128 mA
+                reg = (reg >> 4) & 0x0f;
+                *pCurrentMA += ((int32_t) reg) * 128;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): pre-charging current limit is %.3f A.\r\n", gAddress >> 1, (float) *pCurrentMA / 1000);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Set the boost voltage.
+bool BatteryChargerBq24295::setBoostVoltage (int32_t voltageMV)
+{
+    bool success = false;
+    
+    // TODO
+    
+    return success;
+}
+
+/// Get the boost voltage.
+bool BatteryChargerBq24295::getBoostVoltage (int32_t *pVoltageMV)
+{
+    bool success = false;
+    
+    // TODO
+    
+    return success;
+}
+
+/// Set the boost mode low temperature limit.
+bool BatteryChargerBq24295::setBoostLowerTemperatureLimit (int32_t temperatureC)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // There are only two possible values, -10 C and -20 C.
+        // BCOLD is bit 1 of the charge current control register
+        if (temperatureC < -10) {
+            success = setRegisterBits(0x02, (1 << 1));
+#ifdef DEBUG_BQ24295
+            printf("BatteryChargerBq24295 (I2C 0x%02x): boost mode lower temperature limit -20 C.\r\n", gAddress >> 1);
+#endif
+        } else {
+            success = clearRegisterBits(0x02, (1 << 1));
+#ifdef DEBUG_BQ24295
+            printf("BatteryChargerBq24295 (I2C 0x%02x): boost mode lower temperature limit -10 C.\r\n", gAddress >> 1);
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Get the boost mode low temperature limit.
+bool BatteryChargerBq24295::getBoostLowerTemperatureLimit (int32_t *pTemperatureC)
+{
+    bool success = false;
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // BCOLD is bit 1 of the charge current control register
+        if (getRegister(0x02, &reg)) {
+            success = true;
+            if (pTemperatureC != NULL) {
+                *pTemperatureC = -10;
+                if ((reg & (1 << 1)) != 0) {
+                    *pTemperatureC = -20;
+                }
+            }
+        }
+        
+#ifdef DEBUG_BQ24295
+        if (reg & (1 << 1)) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): boost mode lower temperature limit -20 C.\r\n", gAddress >> 1);
+        } else {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): boost mode lower temperature limit -10 C.\r\n", gAddress >> 1);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+    
 /// Set the input voltage limit.
 bool BatteryChargerBq24295::setInputVoltageLimit (int32_t voltageMV)
 {
@@ -579,6 +947,7 @@ bool BatteryChargerBq24295::setInputVoltageLimit (int32_t voltageMV)
                 reg &= ~(0x0F << 3);
                 reg |= (char) codedLimit;
                 
+               // Write to the input source control register
                 success = setRegister (0x00, reg);
 #ifdef DEBUG_BQ24295
                 if (success) {
@@ -659,6 +1028,7 @@ bool BatteryChargerBq24295::setInputCurrentLimit (int32_t currentMA)
                 reg &= ~(0x07 << 0);
                 reg |= codedLimit;
                 
+               // Write to the input source control register
                 success = setRegister (0x00, reg);
 #ifdef DEBUG_BQ24295
                 if (success) {
@@ -835,182 +1205,6 @@ bool BatteryChargerBq24295::getRechargingVoltageThreshold (int32_t *pVoltageMV)
     return success;
 }
 
-/// Set the fast charging current limit.
-bool BatteryChargerBq24295::setFastChargingCurrentLimit (int32_t currentMA)
-{
-    bool success = false;
-    char reg;
-    int32_t codedValue;
-
-    if (gReady && (gpI2c != NULL)) {
-        gpI2c->lock();
-        // Read the charge current control register
-        if (getRegister(0x02, &reg)) {
-            // Fast charging current limit is in
-            // bits 2 to 7, coded to base "64 mA" with
-            // an offset of 512 mA.
-            if ((currentMA >= 512) && (currentMA <= 3008)) {
-                codedValue = currentMA;
-                codedValue = (codedValue - 512) / 64;
-                codedValue = (codedValue & 0x3f) << 2;
-                
-                reg &= ~(0x3f << 2);
-                reg |= (char) codedValue;
-                
-                success = setRegister (0x02, reg);
-#ifdef DEBUG_BQ24295
-                if (success) {
-                    printf("BatteryChargerBq24295 (I2C 0x%02x): fast charging current limit set to %.3f A.\r\n", gAddress >> 1, (float) currentMA / 1000);
-                }
-#endif
-            }
-        }
-        gpI2c->unlock();
-    }
-
-    return success;
-}
-
-/// Get the fast charging current limit.
-bool BatteryChargerBq24295::getFastChargingCurrentLimit (int32_t *pCurrentMA)
-{
-    bool success = false;
-    char reg;
-
-    if (gReady && (gpI2c != NULL)) {
-        gpI2c->lock();
-        // Read the charge current control register
-        if (getRegister(0x02, &reg)) {
-            success = true;
-            if (pCurrentMA != NULL) {
-                // Fast charging current limit is in bits 2 to 7
-                // Base current
-                *pCurrentMA = 512;
-                // Shift reg down and add the number of multiples
-                // of 64 mA
-                reg = (reg >> 2) & 0x3f;
-                *pCurrentMA += ((int32_t) reg) * 64;
-#ifdef DEBUG_BQ24295
-                printf("BatteryChargerBq24295 (I2C 0x%02x): fast charge current limit is %.3f A.\r\n", gAddress >> 1, (float) *pCurrentMA / 1000);
-#endif
-            }
-        }
-        gpI2c->unlock();
-    }
-
-    return success;
-}
-
-/// Set the pre-charging current limit.
-bool BatteryChargerBq24295::setPrechargingCurrentLimit (int32_t currentMA)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Get the pre-charging current limit.
-bool BatteryChargerBq24295::getPrechargingCurrentLimit (int32_t *pCurrentMA)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Set the charging termination current limit.
-bool BatteryChargerBq24295::setChargingTerminationCurrentLimit (int32_t currentMA)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Get the charging termination current limit.
-bool BatteryChargerBq24295::getChargingTerminationCurrentLimit (int32_t *pCurrentMA)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Enable charging termination.
-bool BatteryChargerBq24295::enableChargingTermination (void)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Disable charging termination.
-bool BatteryChargerBq24295::disableChargingTermination (void)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Get the state of charging termination (enabled or disabled)
-bool BatteryChargerBq24295::isChargingTerminationEnabled (void)
-{
-    bool isEnabled = false;
-    
-    // TODO
-    
-    return isEnabled;
-}
-
-/// Set the boost voltage.
-bool BatteryChargerBq24295::setBoostVoltage (int32_t voltageMV)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Get the boost voltage.
-bool BatteryChargerBq24295::getBoostVoltage (int32_t *pVoltageMV)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Set the fast charging safety timer.
-bool BatteryChargerBq24295::setFastChargingSafetyTimer (int32_t timerHours)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
-/// Get the value of the fast charging safety timer.
-bool BatteryChargerBq24295::getFastChargingSafetyTimer (int32_t *pTimerHours)
-{
-    bool success = false;
-    
-    // TODO
-    
-    return success;
-}
-
 /// Enable shipping mode (lowest possible power state).
 bool BatteryChargerBq24295::setShippingMode(void)
 {
@@ -1021,6 +1215,73 @@ bool BatteryChargerBq24295::setShippingMode(void)
     return success;
 }
 
+/// Get the charger fault status.
+BatteryChargerBq24295::ChargerFault BatteryChargerBq24295::getChargerFault(void)
+{
+    BatteryChargerBq24295::ChargerFault chargerFault = CHARGER_FAULT_UNKNOWN;
+    char reg;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the fault register
+        if (getRegister(0x09, &reg)) {
+            chargerFault = CHARGER_FAULT_NONE;
+            if ((reg & (1 << 8)) != 0) {
+                chargerFault = CHARGER_FAULT_WATCHDOG_EXPIRED;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): watchdog expired.\r\n", gAddress >> 1);
+#endif
+            } else if ((reg & (1 << 7)) != 0) {
+                chargerFault = CHARGER_FAULT_BOOST;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): boost fault.\r\n", gAddress >> 1);
+#endif
+            } else if ((reg & 0x30) != 0) {
+                switch ((reg >> 4) & 0x03) {
+                    case 1:
+                        chargerFault = CHARGER_FAULT_INPUT_FAULT;
+#ifdef DEBUG_BQ24295
+                        printf("BatteryChargerBq24295 (I2C 0x%02x): input fault.\r\n", gAddress >> 1);
+#endif
+                    break;
+                    case 2:
+                        chargerFault = CHARGER_FAULT_THERMAL_SHUTDOWN;
+#ifdef DEBUG_BQ24295
+                        printf("BatteryChargerBq24295 (I2C 0x%02x): thermal shutdown.\r\n", gAddress >> 1);
+#endif
+                    break;
+                    case 3:
+                        chargerFault = CHARGER_FAULT_CHARGE_TIMER_EXPIRED;
+#ifdef DEBUG_BQ24295
+                        printf("BatteryChargerBq24295 (I2C 0x%02x): charge timer expired.\r\n", gAddress >> 1);
+#endif
+                    break;
+                    default:
+                    break;
+                }
+            } else if ((reg & (1 << 3)) != 0) {
+                chargerFault = CHARGER_FAULT_BATTERY_OVER_VOLTAGE;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): battery over-voltage fault.\r\n", gAddress >> 1);
+#endif
+            } else if ((reg & (1 << 1)) != 0) {
+                chargerFault = CHARGER_FAULT_THERMISTOR_TOO_COLD;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): thermistor too cold.\r\n", gAddress >> 1);
+#endif
+            } else if ((reg & (1 << 0)) != 0) {
+                chargerFault = CHARGER_FAULT_THERMISTOR_TOO_HOT;
+#ifdef DEBUG_BQ24295
+                printf("BatteryChargerBq24295 (I2C 0x%02x): thermistor too hot.\r\n", gAddress >> 1);
+#endif
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return chargerFault;
+}
+
 /// Get the reason(s) for an interrupt occurring.
 char BatteryChargerBq24295::getIntReason(void)
 {
@@ -1029,6 +1290,52 @@ char BatteryChargerBq24295::getIntReason(void)
     // TODO
     
     return reason;
+}
+
+/// Read a register on the chip.
+// TODO test
+bool BatteryChargerBq24295::advancedGet(char address, char *pValue)
+{
+    bool success = false;
+    char value;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Read the register
+        if (getRegister(address, &value)) {
+            success = true;
+#ifdef DEBUG_BQ24295
+            printf("BatteryChargerBq24295 (I2C 0x%02x): read 0x%02x from address 0x%02x.\n", gAddress >> 1, value, address);
+#endif
+            if (pValue != NULL) {
+                *pValue = value;
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Set a register on the chip.
+// TODO test
+bool BatteryChargerBq24295::advancedSet(char address, char value)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Set the register
+        success = setRegister (address, value);
+#ifdef DEBUG_BQ24295
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): wrote 0x%02x  to address 0x%02x.\n", gAddress >> 1, value, address);
+        }
+#endif
+        gpI2c->unlock();
+    }
+
+    return success;
 }
 
 // End Of File

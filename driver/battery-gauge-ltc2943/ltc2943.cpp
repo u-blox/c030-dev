@@ -341,8 +341,8 @@ bool BatteryGaugeLtc2943::init (I2C * pI2c, int32_t rSenseMOhm, uint8_t address,
     return gReady;
 }
 
-// Set whether battery charge monitoring is on or off
-bool BatteryGaugeLtc2943::setMonitor (bool onNotOff, bool isSlow)
+/// Switch battery charge monitoring on.
+bool BatteryGaugeLtc2943::enableGauge (bool isSlow)
 {
     bool success = false;
     char data[2];
@@ -356,21 +356,45 @@ bool BatteryGaugeLtc2943::setMonitor (bool onNotOff, bool isSlow)
         if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
             (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
 
-            if (onNotOff) {
-                // Set the ADC mode in bits 6 and 7 to 11 or, if
-                // isSlow is true, to 10 (in which case a measurement
-                // is only performed every ten seconds).
-                data[1] |= 0xc0;
-                if (isSlow) {
-                    data[1] &= ~0x40;
-                }
-                // Also make sure that the power-down bit is not set.
-                data[1] &= ~0x01;
-            } else {
-                // Set the ADC mode to 00 and the power down bit to 1
-                data[1] &= ~0xc0;
-                data[1] |= 0x01;
+            // Set the ADC mode in bits 6 and 7 to 11 or, if
+            // isSlow is true, to 10 (in which case a measurement
+            // is only performed every ten seconds).
+            data[1] |= 0xc0;
+            if (isSlow) {
+                data[1] &= ~0x40;
             }
+            // Also make sure that the power-down bit is not set.
+            data[1] &= ~0x01;
+            
+            // Write the new value to the control register
+            if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {
+                success = true;
+            }
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Switch battery charge monitoring off.
+bool BatteryGaugeLtc2943::disableGauge (void)
+{
+    bool success = false;
+    char data[2];
+    
+    if (gReady && (gpI2c != NULL)){
+        gpI2c->lock();
+        // Read the control register
+        data[0] = 0x01;  // Address of the control register
+        data[1] = 0;
+
+        if ((gpI2c->write(gAddress, &(data[0]), 1, true) == 0) &&
+            (gpI2c->read(gAddress, &(data[1]), 1) == 0)) {
+
+            // Set the ADC mode to 00 and the power down bit to 1
+            data[1] &= ~0xc0;
+            data[1] |= 0x01;
             
             // Write the new value to the control register
             if (gpI2c->write(gAddress, &(data[0]), 2) == 0) {

@@ -55,9 +55,9 @@ public:
         CHARGER_FAULT_THERMISTOR_TOO_COLD = 0x02,
         // Value 0x04 is reserved
         CHARGER_FAULT_BATTERY_OVER_VOLTAGE = 0x08,
-        CHARGER_FAULT_INPUT_FAULT = 0x10,          // Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this
-        CHARGER_FAULT_THERMAL_SHUTDOWN = 0x20,     // Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this
-        CHARGER_FAULT_CHARGE_TIMER_EXPIRED = 0x30, // Looks odd bit it matches the register meaning
+        CHARGER_FAULT_INPUT_FAULT = 0x10,          //!< Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this, be careful when testing the bitmap.
+        CHARGER_FAULT_THERMAL_SHUTDOWN = 0x20,     //!< Note that the value of CHARGER_FAULT_CHARGE_TIMER_EXPIRED overlaps this, be careful when testing the bitmap.
+        CHARGER_FAULT_CHARGE_TIMER_EXPIRED = 0x30, //!< This looks odd as it overlaps the two above but it matches the register meaning as defined by the chip.
         CHARGER_FAULT_OTG = 0x40,
         CHARGER_FAULT_WATCHDOG_EXPIRED = 0x80,
         MAX_NUM_CHARGER_FAULTS
@@ -69,6 +69,10 @@ public:
     ~BatteryChargerBq24295(void);
 
     /// Initialise the BQ24295 chip.
+    // After initialisation the chip will be put into its lowest
+    // power state and should be configured if the default settings
+    // are not satisfactory.  Once the chip is correctly configured,
+    // charging should be enabled.
     // \param pI2c a pointer to the I2C instance to use.
     //\ param address 7-bit I2C address of the battery charger chip.
     // \return true if successful, otherwise false.
@@ -83,10 +87,12 @@ public:
     bool isExternalPowerPresent(void);
 
     /// Enable charging.
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool enableCharging (void);
 
     /// Disable charging.
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool disableCharging (void);
 
@@ -95,10 +101,12 @@ public:
     bool isChargingEnabled (void);
 
     /// Enable OTG charging.
+    // Default is enabled.
     // \return true if successful, otherwise false.
     bool enableOtg (void);
 
     /// Disable OTG charging.
+    // Default is enabled.
     // \return true if successful, otherwise false.
     bool disableOtg (void);
 
@@ -109,7 +117,7 @@ public:
     /// Set the system voltage (the voltage which the
     // chip will attempt to maintain the system at).
     // \param voltageMV the voltage limit, in milliVolts.
-    //        Range is 3000 mV to 3700 mV.
+    //        Range is 3000 mV to 3700 mV, default 3500 mV.
     // \return true if successful, otherwise false.
     bool setSystemVoltage (int32_t voltageMV);
 
@@ -120,7 +128,7 @@ public:
 
     /// Set the fast charging current limit.
     // \param currentMA the fast charging current limit, in milliAmps.
-    //        Range is 512 mA to 3008 mA.
+    //        Range is 512 mA to 3008 mA, default 1024 mA.
     // \return true if successful, otherwise false.
     bool setFastChargingCurrentLimit (int32_t currentMA);
 
@@ -133,7 +141,7 @@ public:
     // \param timerHours the charging safety timer value.
     //        Use a value of 0 to indicate that the timer should be disabled.
     //        Timer values will be translated to the nearest (lower) value
-    //        out of 5, 8, 12, and 20 hours.
+    //        out of 5, 8, 12, and 20 hours, default 12 hours.
     // \return true if successful, otherwise false.
     bool setFastChargingSafetyTimer (int32_t timerHours);
 
@@ -144,10 +152,12 @@ public:
     bool getFastChargingSafetyTimer (int32_t *pTimerHours);
 
     /// Set ICHG/IPRECH margin (see section 8.3.3.5 of the chip data sheet).
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool enableIcghIprechMargin (void);
 
     /// Clear the ICHG/IPRECH margin (see section 8.3.3.5 of the chip data sheet).
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool disableIcghIprechMargin (void);
     
@@ -158,7 +168,7 @@ public:
     
     /// Set the charging termination current.
     // \param currentMA the charging termination current, in milliAmps.
-    //        Range is 128 mA to 2048 mA.
+    //        Range is 128 mA to 2048 mA, default is 256 mA.
     // \return true if successful, otherwise false.
     bool setChargingTerminationCurrent (int32_t currentMA);
 
@@ -168,10 +178,12 @@ public:
     bool getChargingTerminationCurrent (int32_t *pCurrentMA);
 
     /// Enable charging termination.
+    // Default is enabled.
     // \return true if successful, otherwise false.
     bool enableChargingTermination (void);
 
     /// Disable charging termination.
+    // Default is enabled.
     // \return true if successful, otherwise false.
     bool disableChargingTermination (void);
 
@@ -181,6 +193,7 @@ public:
 
     /// Set the pre-charging current limit.
     // \param currentMA the pre-charging current limit, in milliAmps.
+    //        Range is 128 mA to 2048 mA, default is 256 mA.
     // \return true if successful, otherwise false.
     bool setPrechargingCurrentLimit (int32_t currentMA);
 
@@ -191,19 +204,20 @@ public:
 
     /// Set the charging voltage limit.
     // \param voltageMV the charging voltage limit, in milliVolts.
+    //        Range is 3504 mV to 4400 mV, default is 4208 mV.
     // \return true if successful, otherwise false.
     bool setChargingVoltageLimit (int32_t voltageMV);
 
     /// Get the charging voltage limit.
     // \param pVoltageMV a place to put the charging voltage limit,
-    //        in milliVolts.  Range is 3504 mV to 4400 mV.
+    //        in milliVolts.
     // \return true if successful, otherwise false.
     bool getChargingVoltageLimit (int32_t *pVoltageMV);
 
     /// Set the pre-charge to fast-charge voltage threshold.
     // \param voltageMV the threshold, in milliVolts.
     //        Values will be translated to the nearest (highest)
-    //        voltage out of 2800 mV and 3000 mV.
+    //        voltage out of 2800 mV and 3000 mV, default is 3000 mV.
     // \return true if successful, otherwise false.
     bool setFastChargingVoltageThreshold (int32_t voltageMV);
 
@@ -215,7 +229,7 @@ public:
     /// Set the recharging voltage threshold.
     // \param voltageMV the recharging voltage threshold, in milliVolts.
     //        Values will be translated to the nearest (highest)
-    //        voltage out of 100 mV and 300 mV.
+    //        voltage out of 100 mV and 300 mV, default is 100 mV.
     // \return true if successful, otherwise false.
     bool setRechargingVoltageThreshold (int32_t voltageMV);
 
@@ -226,7 +240,7 @@ public:
 
     /// Set the boost voltage.
     // \param voltageMV the boost voltage, in milliVolts.
-    //        Range is 4550 mV to 5510 mV.
+    //        Range is 4550 mV to 5510 mV, default is 5126 mV.
     // \return true if successful, otherwise false.
     bool setBoostVoltage (int32_t voltageMV);
 
@@ -238,7 +252,7 @@ public:
     /// Set the boost mode upper temperature limit.
     // \param temperatureC the temperature in C.
     //        Values will be translated to the nearest (lower)
-    //        of 55 C, 60 C and 65 C.
+    //        of 55 C, 60 C and 65 C (disabled by default).
     // \return true if successful, otherwise false.
     bool setBoostUpperTemperatureLimit (int32_t temperatureC);
 
@@ -255,13 +269,14 @@ public:
     bool isBoostUpperTemperatureLimitEnabled (void);
 
     /// Disable the boost mode upper temperature limit.
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool disableBoostUpperTemperatureLimit (void);
 
     /// Set the boost mode low temperature limit.
     // \param temperatureC the temperature in C.
     //        Values will be translated to the nearest (higher)
-    //        of -10 C and -20 C.
+    //        of -10 C and -20 C, default is -10 C.
     // \return true if successful, otherwise false.
     bool setBoostLowerTemperatureLimit (int32_t temperatureC);
 
@@ -272,9 +287,10 @@ public:
     
     /// Set the input voltage limit.  If the input falls below
     // this level then charging will be ramped down.  The limit
-    // does not take effect until enableInputLimits() is called.
+    // does not take effect until enableInputLimits() is called
+    // (default setting is disabled).
     // \param voltageMV the input voltage limit, in milliVolts.
-    //        Range is 3880 mV to 5080 mV.
+    //        Range is 3880 mV to 5080 mV, default is 4760 mV.
     // \return true if successful, otherwise false.
     bool setInputVoltageLimit (int32_t voltageMV);
 
@@ -286,9 +302,11 @@ public:
     /// Set the input current limit.  If the current drawn
     // goes above this limit then charging will be ramped down.
     // The limit does not take effect until enableInputLimits()
-    // is called.
+    // is called (default setting is disabled).
     // \param currentMA the input current limit, in milliAmps.
-    //        Range is 100 mA to 3000 mA.
+    //        Range is 100 mA to 3000 mA, default depends upon
+    //        hardware configuration, see section 8.3.1.4.3 of
+    //        the data sheet.
     // \return true if successful, otherwise false.
     bool setInputCurrentLimit (int32_t currentMA);
 
@@ -298,10 +316,12 @@ public:
     bool getInputCurrentLimit (int32_t *pCurrentMA);
 
     /// Enable input voltage and current limits.
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool enableInputLimits (void);
 
     /// Remove any input voltage or current limits.
+    // Default is disabled.
     // \return true if successful, otherwise false.
     bool disableInputLimits (void);
 
@@ -312,7 +332,7 @@ public:
     /// Set the thermal regulation threshold for the chip.
     // \param temperatureC the temperature in C.
     //        Values will be translated to the nearest (lower)
-    //        of 60 C, 80 C, 100 C and 120 C.
+    //        of 60 C, 80 C, 100 C and 120 C, default 120 C.
     // \return true if successful, otherwise false.
     bool setChipThermalRegulationThreshold (int32_t temperatureC);
 

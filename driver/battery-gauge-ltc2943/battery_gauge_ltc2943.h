@@ -67,6 +67,7 @@ public:
     ~BatteryGaugeLtc2943(void);
 
     /// Initialise the LTC2943 chip.
+    // After initialisation the chip will be put into its lowest power state.
     // \param pI2c a pointer to the I2C instance to use.
     // \param rSenseMOhm the value of the sense resistor being used, in milli Ohms.
     //\ param address 7-bit I2C address of the LiPo gauge chip.
@@ -82,23 +83,27 @@ public:
     // \return true if it is detected otherwise false.
     bool isBatteryDetected (void);
     
-    /// Switch on/off the battery capacity monitor
-    // \param onNotOff true to begin monitoring battery capacity, false to stop.
+    /// Switch on the battery gauge.  The chip will consume more
+    // power when battery gauging is enabled.
     // \param isSlow set this to true to save power if the battery current is not fluctuating very much.
     // \return true if successful, otherwise false.
-    bool setMonitor (bool onNotOff, bool isSlow = false);
+    bool enableGauge (bool isSlow = false);
 
-    /// Read the temperature of the LTC2943 chip.  If monitoring is
+    /// Switch off the battery gauge.
+    // \return true if successful, otherwise false.
+    bool disableGauge (void);
+
+    /// Read the temperature of the LTC2943 chip.  If gauging is
     // active the temperature will be that of the last reading; if
-    // monitoring is not active then a reading will be taken
+    // gauging is not active then a reading will be taken
     // immediately, which takes around 300 ms.
     // \param pTemperatureC place to put the temperature reading.
     // \return true if successful, otherwise false.
     bool getTemperature (int32_t *pTemperatureC);
 
-    /// Read the voltage of the battery.  If monitoring is
+    /// Read the voltage of the battery.  If gauging is
     // active the voltage will be that of the last reading; if
-    // monitoring is not active then a reading will be taken
+    // gauging is not active then a reading will be taken
     // immediately, which takes around 300 ms.
     // \param pVoltageMV place to put the voltage reading.
     // \return true if successful, otherwise false.
@@ -106,8 +111,8 @@ public:
 
     /// Read the current flowing through rSense.  The value will be
     // positive when the battery is charging and negative when it is
-    // discharging.  If monitoring is active the current will be
-    // that of the last reading; if monitoring is not active then a
+    // discharging.  If gauging is active the current will be
+    // that of the last reading; if gauging is not active then a
     // reading will be taken immediately, which takes around 300 ms.
     // \param pCurrentMA place to put the current reading.
     // \return true if successful, otherwise false.

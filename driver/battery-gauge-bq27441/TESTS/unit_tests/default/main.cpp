@@ -73,18 +73,18 @@ void test_monitor() {
     BatteryGaugeBq27441 * pBatteryGauge = new BatteryGaugeBq27441();
     
     // Call should fail if the battery gauge has not been initialised
-    TEST_ASSERT_FALSE(pBatteryGauge->setMonitor(true));
+    TEST_ASSERT_FALSE(pBatteryGauge->enableGauge());
     
     TEST_ASSERT(pBatteryGauge->init(gpI2C));
     // Normal case
-    TEST_ASSERT(pBatteryGauge->setMonitor(true));
+    TEST_ASSERT(pBatteryGauge->enableGauge());
     // TODO do something to assess whether it's actually working
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    TEST_ASSERT(pBatteryGauge->disableGauge());
     
     // Normal case, slow mode
-    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));    
+    TEST_ASSERT(pBatteryGauge->enableGauge(true));    
     // TODO do something to assess whether it's actually working slowly
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    TEST_ASSERT(pBatteryGauge->disableGauge());
 }
 
 // Test that battery detection can be performed
@@ -435,8 +435,8 @@ void test_advanced_seal() {
     (data2[0])--;
     printf ("Calling advancedSetConfig()...\n");
     TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
-    printf ("Calling setMonitor(\"true\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(true));
+    printf ("Calling enableGauge()...\n");
+    TEST_ASSERT(pBatteryGauge->enableGauge());
     printf ("Calling isBatteryDetected()...\n");
     TEST_ASSERT(pBatteryGauge->isBatteryDetected());
     printf ("Calling getTemperature()...\n");
@@ -449,10 +449,10 @@ void test_advanced_seal() {
     TEST_ASSERT(pBatteryGauge->getRemainingCapacity(&value));
     printf ("Calling getRemainingPercentage()...\n");
     TEST_ASSERT(pBatteryGauge->getRemainingPercentage(&value));
-    printf ("Calling setMonitor(\"true\", \"true\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));
-    printf ("Calling setMonitor(\"false\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    printf ("Calling enableGauge(\"true\")...\n");
+    TEST_ASSERT(pBatteryGauge->enableGauge(true));
+    printf ("Calling disableGauge()...\n");
+    TEST_ASSERT(pBatteryGauge->disableGauge());
 
     // Now unseal it
     printf ("Calling advancedUnseal()...\n");
@@ -471,8 +471,8 @@ void test_advanced_seal() {
     (data2[0])--;
     printf ("Calling advancedSetConfig()...\n");
     TEST_ASSERT(pBatteryGauge->advancedSetConfig(subClassId, offset, length, &(data2[0])));
-    printf ("Calling setMonitor(\"true\", \"true\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));
+    printf ("Calling enableGauge(\"true\")...\n");
+    TEST_ASSERT(pBatteryGauge->enableGauge(true));
     printf ("Calling isBatteryDetected()...\n");
     TEST_ASSERT(pBatteryGauge->isBatteryDetected());
     printf ("Calling getTemperature()...\n");
@@ -485,8 +485,8 @@ void test_advanced_seal() {
     TEST_ASSERT(pBatteryGauge->getRemainingCapacity(&value));
     printf ("Calling getRemainingPercentage()...\n");
     TEST_ASSERT(pBatteryGauge->getRemainingPercentage(&value));
-    printf ("Calling setMonitor(\"false\")...\n");
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    printf ("Calling disableGauge()...\n");
+    TEST_ASSERT(pBatteryGauge->disableGauge());
 
     // TODO: I had some tests in here to check that init() and
     // advancedUnseal() behave when given the wrong seal code.

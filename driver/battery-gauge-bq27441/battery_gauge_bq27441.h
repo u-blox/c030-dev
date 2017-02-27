@@ -45,44 +45,68 @@ public:
     /// Destructor.
     ~BatteryGaugeBq27441(void);
 
-    /// Initialise the BQ27441 chip.
+    /// Initialise the BQ27441 chip.  Once initialised
+    // the chip is put into its lowest power state.  Any API call
+    // will awaken the chip from this state and then return it once
+    // more to the lowest possible power state.
     // \param pI2c a pointer to the I2C instance to use.
     //\ param address 7-bit I2C address of the battery gauge chip.
     // \param sealCode the 16 bit seal code that will unseal the device if it is sealed.
     // \return true if successful, otherwise false.
     bool init (I2C * pI2c, uint8_t address = BATTERY_GAUGE_BQ27441_ADDRESS, uint16_t sealCode = SEAL_CODE_DEFAULT);
 
-    /// Switch on/off the battery capacity monitor
-    // \param onNotOff true to begin monitoring battery capacity, false to stop.
+    /// Switch on the battery gauge.  Battery gauging must be switched on
+    // for the battery capacity and percentage readings to be valid. The
+    // chip will consume more when battery gauging is switched on.
     // \param isSlow set this to true to save power if the battery current is not fluctuating very much.
     // \return true if successful, otherwise false.
-    bool setMonitor (bool onNotOff, bool isSlow = false);
+    bool enableGauge (bool isSlow = false);
+
+    /// Switch off the battery gauge.
+    // \return true if successful, otherwise false.
+    bool disableGauge (void);
 
     /// Determine whether a battery has been detected or not.
     // \return true if a battery has been detected, otherwise false.
     bool isBatteryDetected (void);
     
     /// Read the temperature of the BQ27441 chip.
+    // If battery gauging is off this function will take ~1 second
+    // to return while the ADCs are activated and the reading is taken.
+    // If battery gauging is on, the last temperature reading taken
+    // will be returned without delay.
     // \param pTemperatureC place to put the temperature reading.
     // \return true if successful, otherwise false.
     bool getTemperature (int32_t *pTemperatureC);
 
     /// Read the voltage of the battery.
+    // If battery gauging is off this function will take ~1 second
+    // to return while the ADCs are activated and the reading is taken.
+    // If battery gauging is on, the last voltage reading taken
+    // will be returned without delay.
     // \param pVoltageMV place to put the voltage reading.
     // \return true if successful, otherwise false.
     bool getVoltage (int32_t *pVoltageMV);
 
     /// Read the current flowing from the battery.
+    // If battery gauging is off this function will take ~1 second
+    // to return while the ADCs are activated and the reading is taken.
+    // If battery gauging is on, the last current reading taken
+    // will be returned without delay.
     // \param pCurrentMA place to put the current reading.
     // \return true if successful, otherwise false.
     bool getCurrent (int32_t *pCurrentMA);
 
     /// Read the remaining available battery energy.
+    // The battery capacity reading will only be valid if
+    // battery gauging is switched on.
     // \param pCapacityMAh place to put the capacity reading.
     // \return true if successful, otherwise false.
     bool getRemainingCapacity (int32_t *pCapacityMAh);
 
     /// Read the state of charge of the battery as a percentage.
+    // The remaining percentage will only be valid if battery
+    // gauging is switched on.
     // \param pBatteryPercent place to put the reading.
     // \return true if successful, otherwise false.
     bool getRemainingPercentage (int32_t *pBatteryPercent);
@@ -125,8 +149,6 @@ public:
     bool advancedSetConfig(uint8_t subClassId, int32_t offset, int32_t length, const char * pData);
 
     /// Send a control word (see section 4.1 of the BQ27441 technical reference manual).
-    // Note: if the chip is sealed and the control word being sent only works for unsealed
-    // access then it is up to the caller to unseal the chip first.
     // \param controlWord the control word to send.
     // \param pDataReturned a place to put the word of data that could be returned,
     //        depending on which control word is used (may be NULL).
@@ -145,18 +167,21 @@ public:
     // \return true if it is SEALED, otherwise false.
     bool advancedIsSealed(void);
 
-    /// Put the chip into SEALED mode.
+    /// Put the chip into SEALED mode.  SEALED mode is
+    // used to prevent accidental writes to the chip when it
+    // is in a production device.  All of the functions in this
+    // class are able to work with a SEALED chip, provided the
+    // correct seal code is provided to the init() function.
     // \return true if successful, otherwise false.
     bool advancedSeal(void);
     
     /// Send the seal code to the chip to unseal it.
-    // Note: if the chip is reset, as it is by the advancedGetConfig() call, then it
-    // will become sealed again.
     // \param sealCode the 16 bit seal code that will unseal the chip if it is sealed.
     // \return true if successful, otherwise false.
     bool advancedUnseal(uint16_t sealCode = SEAL_CODE_DEFAULT);
 
     /// Do a hard reset of the chip, reinitialising RAM data to defaults from ROM.
+    // Note: the SEALED/UNSEALED status of the chip is unaffected.
     // \return true if successful, otherwise false.
     bool advancedReset(void);
     
@@ -170,7 +195,7 @@ protected:
     /// Flag to indicate device is ready.
     bool gReady;
     /// Flag to indicate that monitor mode is active.
-    bool gMonitorOn;
+    bool gGaugeOn;
 
     /// Read two bytes starting at a given address.
     // Note: gpI2c should be locked before this is called.

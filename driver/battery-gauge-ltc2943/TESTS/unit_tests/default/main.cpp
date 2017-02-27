@@ -109,18 +109,18 @@ void test_monitor() {
     BatteryGaugeLtc2943 * pBatteryGauge = new BatteryGaugeLtc2943();
     
     // Call should fail if the battery gauge has not been initialised
-    TEST_ASSERT_FALSE(pBatteryGauge->setMonitor(true));
+    TEST_ASSERT_FALSE(pBatteryGauge->enableGauge());
     
     TEST_ASSERT(pBatteryGauge->init(gpI2C, RSENSE_MOHM));
     // Normal case
-    TEST_ASSERT(pBatteryGauge->setMonitor(true));    
+    TEST_ASSERT(pBatteryGauge->enableGauge());    
     // TODO do something to assess whether it's actually working
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    TEST_ASSERT(pBatteryGauge->disableGauge());
     
     // Normal case, slow mode
-    TEST_ASSERT(pBatteryGauge->setMonitor(true, true));    
+    TEST_ASSERT(pBatteryGauge->enableGauge(true));    
     // TODO do something to assess whether it's actually working slowly
-    TEST_ASSERT(pBatteryGauge->setMonitor(false));
+    TEST_ASSERT(pBatteryGauge->disableGauge());
 }
 
 // Test that a temperature reading can be performed

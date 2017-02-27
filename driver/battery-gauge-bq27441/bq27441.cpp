@@ -574,7 +574,7 @@ BatteryGaugeBq27441::BatteryGaugeBq27441(void)
 {
     gpI2c = NULL;
     gReady = false;
-    gMonitorOn = false;
+    gGaugeOn = false;
     gSealCode = 0;
 }
 
@@ -657,60 +657,71 @@ bool BatteryGaugeBq27441::init (I2C * pI2c, uint8_t address, uint16_t sealCode)
     return gReady;
 }
 
-/// Switch on/off the battery capacity monitor
-bool BatteryGaugeBq27441::setMonitor (bool onNotOff, bool isSlow)
+/// Switch on the battery capacity monitor.
+bool BatteryGaugeBq27441::enableGauge (bool isSlow)
 {
     bool success = false;
     char data[3];
     
     if (gReady && (gpI2c != NULL)) {
         gpI2c->lock();
-        if (onNotOff) {            
-            // Make sure that we are not in hibernate
-            data[0] = 0x00;  // Set address to first register for control
-            data[1] = 0x12;  // First byte of CLEAR_HIBERNATE sub-command (0x12)
-            data[2] = 0x00;  // Second byte of CLEAR_HIBERNATE sub-command (0x00)
-            if (gpI2c->write(gAddress, &(data[0]), 3) == 0) {
-                gMonitorOn = true;
-                // Read the OpConfig register which is in the Registers sub-class
-                // (64) at offset 0.
-                if (readExtendedData(64, 0, 2, &(data[0]))) {
+        // Make sure that we are not in hibernate
+        data[0] = 0x00;  // Set address to first register for control
+        data[1] = 0x12;  // First byte of CLEAR_HIBERNATE sub-command (0x12)
+        data[2] = 0x00;  // Second byte of CLEAR_HIBERNATE sub-command (0x00)
+        if (gpI2c->write(gAddress, &(data[0]), 3) == 0) {
+            gGaugeOn = true;
+            // Read the OpConfig register which is in the Registers sub-class
+            // (64) at offset 0.
+            if (readExtendedData(64, 0, 2, &(data[0]))) {
 #ifdef DEBUG_BQ27441
-                    printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig is 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
+                printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig is 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
 #endif                        
-                    // SLEEP mode is bit 5 of the low byte of OpConfig.  In SLEEP
-                    // mode a reading is taken every 20 seconds.
-                    if (isSlow && ((data[1] & (1 << 5)) == 0)) {
-                        // Set the SLEEP bit 'cos it's not set and needs to be
-                        data[1] |= 1 << 5;
-                        // Write the new value back
-                        success = writeExtendedData(64, 0, 2, &(data[0]));
+                // SLEEP mode is bit 5 of the low byte of OpConfig.  In SLEEP
+                // mode a reading is taken every 20 seconds.
+                if (isSlow && ((data[1] & (1 << 5)) == 0)) {
+                    // Set the SLEEP bit 'cos it's not set and needs to be
+                    data[1] |= 1 << 5;
+                    // Write the new value back
+                    success = writeExtendedData(64, 0, 2, &(data[0]));
 #ifdef DEBUG_BQ27441
-                        if (success) {
-                            printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig becomes 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
-                        }
-#endif                        
-                    } else if (!isSlow && ((data[1] & (1 << 5)) != 0)) {
-                        // Clear the SLEEP bit 'cos it's set and shouldn't be
-                        data[1] &= ~(1 << 5);
-                        // Write the new value back
-                        success = writeExtendedData(64, 0, 2, &(data[0]));
-#ifdef DEBUG_BQ27441
-                        if (success) {
-                            printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig becomes 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
-                        }
-#endif                        
-                    } else {
-                        success = true;
+                    if (success) {
+                        printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig becomes 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
                     }
+#endif                        
+                } else if (!isSlow && ((data[1] & (1 << 5)) != 0)) {
+                    // Clear the SLEEP bit 'cos it's set and shouldn't be
+                    data[1] &= ~(1 << 5);
+                    // Write the new value back
+                    success = writeExtendedData(64, 0, 2, &(data[0]));
+#ifdef DEBUG_BQ27441
+                    if (success) {
+                        printf("BatteryGaugeBq27441 (I2C 0x%02x): OpConfig becomes 0x%02x%02x.\r\n", gAddress >> 1, data[0], data[1]);
+                    }
+#endif                        
+                } else {
+                    success = true;
                 }
             }
-        } else {
-            // Send SET_HIBERNATE
-            if (setHibernate()) {
-                success = true;
-                gMonitorOn = false;
-            }
+        }
+        
+        gpI2c->unlock();
+    }
+    
+    return success;
+}
+
+/// Switch off the battery capacity monitor.
+bool BatteryGaugeBq27441::disableGauge (void)
+{
+    bool success = false;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Send SET_HIBERNATE
+        if (setHibernate()) {
+            success = true;
+            gGaugeOn = false;
         }
         
         gpI2c->unlock();
@@ -728,7 +739,7 @@ bool BatteryGaugeBq27441::isBatteryDetected (void)
     if (gReady && (gpI2c != NULL)) {
         
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();            
             // Read from the flags register address
             if (getTwoBytes (0x06, &data)) {
@@ -748,7 +759,7 @@ bool BatteryGaugeBq27441::isBatteryDetected (void)
             }
             
             // Set hibernate again if we are not monitoring
-            if (!gMonitorOn) {
+            if (!gGaugeOn) {
                 setHibernate();
             }
 
@@ -768,7 +779,7 @@ bool BatteryGaugeBq27441::getTemperature (int32_t *pTemperatureC)
 
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();
             // Read from the temperature register address
             if (getTwoBytes (0x02, &data)) {
@@ -787,7 +798,7 @@ bool BatteryGaugeBq27441::getTemperature (int32_t *pTemperatureC)
             }
         
             // Return to sleep if we are allowed to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
             
@@ -806,7 +817,7 @@ bool BatteryGaugeBq27441::getVoltage (int32_t *pVoltageMV)
 
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();
             // Read from the voltage register address
             if (getTwoBytes (0x04, &data)) {
@@ -823,7 +834,7 @@ bool BatteryGaugeBq27441::getVoltage (int32_t *pVoltageMV)
             }
 
             // Return to sleep if we are allowed to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
 
@@ -843,7 +854,7 @@ bool BatteryGaugeBq27441::getCurrent (int32_t *pCurrentMA)
 
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();            
             // Read from the average current register address
             if (getTwoBytes (0x10, &data)) {
@@ -859,7 +870,7 @@ bool BatteryGaugeBq27441::getCurrent (int32_t *pCurrentMA)
             }
 
             // Return to sleep if we are allowed to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
 
@@ -878,7 +889,7 @@ bool BatteryGaugeBq27441::getRemainingCapacity (int32_t *pCapacityMAh)
 
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();            
             // Read from the RemainingCapacity register address
             
@@ -896,7 +907,7 @@ bool BatteryGaugeBq27441::getRemainingCapacity (int32_t *pCapacityMAh)
             }
 
             // Return to sleep if we are allowed to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
 
@@ -915,11 +926,11 @@ bool BatteryGaugeBq27441::getRemainingPercentage (int32_t *pBatteryPercent)
 
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();            
             
             // Wake up and take a reading if we have to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
 
@@ -937,7 +948,7 @@ bool BatteryGaugeBq27441::getRemainingPercentage (int32_t *pBatteryPercent)
             }
 
             // Return to sleep if we are allowed to
-            if (!gMonitorOn && !setHibernate()) {
+            if (!gGaugeOn && !setHibernate()) {
                 success = false;
             }
 
@@ -964,7 +975,7 @@ bool BatteryGaugeBq27441::advancedGetConfig(uint8_t subClassId, int32_t offset, 
 #endif
 
         // Return to sleep if we are allowed to
-        if (!gMonitorOn && !setHibernate()) {
+        if (!gGaugeOn && !setHibernate()) {
             success = false;
         }
 
@@ -990,7 +1001,7 @@ bool BatteryGaugeBq27441::advancedSetConfig(uint8_t subClassId, int32_t offset, 
 #endif
 
         // Return to sleep if we are allowed to
-        if (!gMonitorOn && !setHibernate()) {
+        if (!gGaugeOn && !setHibernate()) {
             success = false;
         }
 
@@ -1043,7 +1054,7 @@ bool BatteryGaugeBq27441::advancedGet (uint8_t address, uint16_t *pDataReturned)
     if (gReady && (gpI2c != NULL)) {
         // Make sure there's a recent reading, as most
         // of these commands involve the chip having done one
-        if (gMonitorOn || makeAdcReading()) {            
+        if (gGaugeOn || makeAdcReading()) {            
             gpI2c->lock();
             // Read the data
             if (getTwoBytes(address, &value)) {
@@ -1073,7 +1084,7 @@ bool BatteryGaugeBq27441::advancedIsSealed()
         sealed = isSealed();
         
         // Return to sleep if we are allowed to
-        if (!gMonitorOn) {
+        if (!gGaugeOn) {
             setHibernate();
         }
 
@@ -1094,7 +1105,7 @@ bool BatteryGaugeBq27441::advancedSeal()
         success = seal();
 
         // Return to sleep if we are allowed to
-        if (!gMonitorOn && !setHibernate()) {
+        if (!gGaugeOn && !setHibernate()) {
             success = false;
         }
 
@@ -1126,7 +1137,7 @@ bool BatteryGaugeBq27441::advancedUnseal(uint16_t sealCode)
         }
 
         // Return to sleep if we are allowed to
-        if (!gMonitorOn && !setHibernate()) {
+        if (!gGaugeOn && !setHibernate()) {
             success = false;
         }
 
@@ -1168,7 +1179,7 @@ bool BatteryGaugeBq27441::advancedReset(void)
         }
         
         // Return to sleep if we are allowed to
-        if (!gMonitorOn && !setHibernate()) {
+        if (!gGaugeOn && !setHibernate()) {
             success = false;
         }
         

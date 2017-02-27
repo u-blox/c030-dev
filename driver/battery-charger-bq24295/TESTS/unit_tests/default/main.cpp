@@ -99,7 +99,7 @@ void test_charger_fault() {
     // Normal case
     TEST_ASSERT(pBatteryCharger->init(gpI2C));
     bitmap = pBatteryCharger->getChargerFaults();
-    printf ("Charger fault is %d.\n", bitmap);
+    printf ("Charger fault is 0x%02x.\n", bitmap);
     // Should be just the watchdog as we are in host mode and are not servicing the watchdog
     // TODO: find a way to test other faults
     TEST_ASSERT_EQUAL_INT8((char) BatteryChargerBq24295::CHARGER_FAULT_WATCHDOG_EXPIRED, bitmap);

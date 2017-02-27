@@ -31,7 +31,7 @@
 #endif
 
 // ----------------------------------------------------------------
-// GENERAL COMPILE-TIME CONSTANTS
+// COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
 /// How many loops to wait for a configuration update to be permitted.

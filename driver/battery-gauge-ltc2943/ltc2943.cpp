@@ -30,7 +30,7 @@
 #endif
 
 // ----------------------------------------------------------------
-// GENERAL COMPILE-TIME CONSTANTS
+// COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
 /// How long to wait for one ADC read of temperature, voltage and current

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BATTERY_CHARGER_BQ24295_HPP
-#define BATTERY_CHARGER_BQ24295_HPP
+#ifndef BATTERY_CHARGER_BQ24295_H
+#define BATTERY_CHARGER_BQ24295_H
 
 /**
  * @file battery_charger_bq24295.h
@@ -23,7 +23,7 @@
  */
 
 // ----------------------------------------------------------------
-// GENERAL COMPILE-TIME CONSTANTS
+// COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
 /// Device I2C address.

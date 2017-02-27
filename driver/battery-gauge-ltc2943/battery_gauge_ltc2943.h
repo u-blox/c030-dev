@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BATTERY_GAUGE_LTC2943_HPP
-#define BATTERY_GAUGE_LTC2943_HPP
+#ifndef BATTERY_GAUGE_LTC2943_H
+#define BATTERY_GAUGE_LTC2943_H
 
 /**
  * @file battery_gauge_ltc2943.h
@@ -23,7 +23,7 @@
  */
 
 // ----------------------------------------------------------------
-// GENERAL COMPILE-TIME CONSTANTS
+// COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
 /// Device I2C address.

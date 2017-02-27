@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BATTERY_GAUGE_BQ27441_HPP
-#define BATTERY_GAUGE_BQ27441_HPP
+#ifndef BATTERY_GAUGE_BQ27441_H
+#define BATTERY_GAUGE_BQ27441_H
 
 /**
  * @file battery_gauge_bq27441.h
@@ -23,7 +23,7 @@
  */
 
 // ----------------------------------------------------------------
-// GENERAL COMPILE-TIME CONSTANTS
+// COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
 /// Device I2C address.

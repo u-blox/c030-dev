@@ -1529,9 +1529,9 @@ bool BatteryChargerBq24295::disableInputLimits (void)
         // Input limit enable is bit 7 of the source control register
         success = clearRegisterBits(0x00, (1 << 7));
 #ifdef DEBUG_BQ24295
-            if (success) {
-                printf("BatteryChargerBq24295 (I2C 0x%02x): input limits now DISABLED.\r\n", gAddress >> 1);
-            }
+        if (success) {
+            printf("BatteryChargerBq24295 (I2C 0x%02x): input limits now DISABLED.\r\n", gAddress >> 1);
+        }
 #endif
         gpI2c->unlock();
     }
@@ -1665,8 +1665,84 @@ char BatteryChargerBq24295::getChargerFaults(void)
     return bitmap;
 }
 
+/// Enable shipping mode.
+bool BatteryChargerBq24295::enableShippingMode (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Have to disable the watchdog (bits 4 & 5 of charge termination/timer control register)
+        if (clearRegisterBits(0x05, (1 << 4) || (1 << 5))) {
+            // Now disable the BATFET, bit 5 of the misc operation control register
+            success = setRegisterBits(0x07, (1 << 5));
+#ifdef DEBUG_BQ24295
+            if (success) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): shipping mode is now ENABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Disable shipping mode.
+bool BatteryChargerBq24295::disableShippingMode (void)
+{
+    bool success = false;
+
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // Set the watchdog timer back to default (bit 4 of charge termination/timer control register)
+        if (setRegisterBits(0x05, (1 << 4))) {
+            // Now enable the BATFET, bit 5 of the misc operation control register
+            success = clearRegisterBits(0x07, (1 << 5));
+#ifdef DEBUG_BQ24295
+            if (success) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): shipping mode is now DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return success;
+}
+
+/// Check if shipping mode is enabled.
+bool BatteryChargerBq24295::isShippingModeEnabled (void)
+{
+    bool isEnabled = false;
+    char reg;
+    
+    if (gReady && (gpI2c != NULL)) {
+        gpI2c->lock();
+        // To be in shipping mode the watchdog has to be disabled
+        if (getRegister(0x05, &reg)) {
+            // Check bits 4 & 5 of the charge termination/timer control register for zero
+            if ((reg & ((1 << 4) || (1 << 5))) == 0) {
+                // Now see if the BATFET is disabled (bit 5 of the misc operation control register)
+                if (getRegister(0x07, &reg) && ((reg & (1 << 5)) != 0)) {
+                    isEnabled = true;
+                }
+            }
+#ifdef DEBUG_BQ24295
+            if (isEnabled) {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): shipping mode is ENABLED.\r\n", gAddress >> 1);
+            } else {
+                printf("BatteryChargerBq24295 (I2C 0x%02x): shipping mode is DISABLED.\r\n", gAddress >> 1);
+            }
+#endif
+        }
+        gpI2c->unlock();
+    }
+
+    return isEnabled;
+}
+
 /// Read a register on the chip.
-// TODO test
 bool BatteryChargerBq24295::advancedGet(char address, char *pValue)
 {
     bool success = false;

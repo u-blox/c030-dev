@@ -348,6 +348,22 @@ public:
     // \return a bit-map of that can be tested against ChargerFault.
     char getChargerFaults(void);
     
+    /// Enable shipping mode.
+    // In shipping mode the battery is disconnected from the system
+    // to avoid leakage.  Default is disabled.
+    // \return true if successful, otherwise false.
+    bool enableShippingMode (void);
+
+    /// Disable shipping mode.
+    // In shipping mode the battery is disconnected from the system
+    // to avoid leakage.  Default is disabled.
+    // \return true if successful, otherwise false.
+    bool disableShippingMode (void);
+
+    /// Check whether shipping mode is enabled.
+    // \return true if input limits are enabled, otherwise false.
+    bool isShippingModeEnabled (void);
+
     /// Advanced function to read a register on the chip.
     // \param address the address to read from.
     // \param pValue a place to put the returned value.

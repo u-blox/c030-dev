@@ -38,11 +38,11 @@
 // Note that variables marked in this way cannot be statically
 // initialised, their initial values at cold-start will always be zero,
 // i.e. even with the following declaration importantThing will
-// have value of 0 when it is first accessed:
+// have a value of 0 when it is first accessed:
 //
 // BACKUP_SRAM
 // uint32_t importantThing = 3;
-#define BACKUP_SRAM __attribute__ ((section ("BKPSRAM")));
+#define BACKUP_SRAM __attribute__ ((section ("BKPSRAM")))
 
 // ----------------------------------------------------------------
 // CLASSES
@@ -56,33 +56,86 @@ public:
     LowPower(void);
     /// Destructor.
     ~LowPower(void);
-    
+
     /// Enter Stop mode.
-    // \param stopTimeSeconds the amount of time to remain in Stop
+    // \param stopPeriodSeconds the amount of time to remain in Stop
     //        mode for.  When the time has expired the function
-    //        will return.  Any RTOS timers that expire during
-    //        Stop mode will be ignored.
-    // \param enableInterrupts if true, any interrupt will cause
-    //        a wake-up from Stop mode otherwise only the one
+    //        will return.  The maximum delay is one calender month.
+    // \param enableInterrupts if true, any interrupt can cause
+    //        a wake-up from Stop mode, otherwise only the one
     //        interrupt required to wake from Stop mode will be
     //        enabled.  Note: during Stop mode the processor is
     //        running from 32 kHz crystal and so any timer
-    //        interrupts will be correspondingly longer.
-    void enterStop(uint32_t stopTimeSeconds, bool enableInterrupts = false);
-    
-    
-    /// Enter Standby mode.  Note that this function does NOT return.
-    // \param standbyTimeSeconds the amount of time to remain in Standy
+    //        interrupts will run correspondingly slower.
+    // \return true if successful, otherwise false.
+    bool enterStop(time_t stopPeriodSeconds, bool enableInterrupts = false);
+
+
+    /// Enter Standby mode.  Note that this function does NOT return.  Or
+    // rather, if this function returns, there has been an error.
+    // \param standbyPeriodSeconds the amount of time to remain in Standby
     //        mode for.  When the time has expired the processor will
     //        be reset and begin execution once more from main().  The
     //        values stored in BACKUP_SRAM will be retained, all other
     //        variables will be reset to their initial state. The RTOS
     //        is suspended on entry to Standby mode (i.e. no RTOS timers
     //        will expire) and the RTOS will be reset on return to main().
-    void enterStandby(uint32_t standyTimeSeconds);
-    
+    //        The maximum delay is one calender month.
+    // \param powerDownBackupSram if true, backup SRAM will also be powered
+    //        down in standby mode, otherwise it will be retained.
+    void enterStandby(time_t standbyPeriodSeconds, bool powerDownBackupSram = false);
+
 protected:
 
+    /// The calendar year represented by our earliest date/time.
+#   define BASE_YEAR 1990
+    /// A limit placed on us by the RTC.
+#   define YEAR_MAX 99
+
+    /// A structure to hold a date/time
+    // in a format that matches the fields
+    // of the RTC hardware that this class
+    // is interested in.
+    typedef struct {
+        uint32_t second;   //<! 0 to 59
+        uint32_t minute;   //<! 0 to 59
+        uint32_t hour;     //<! 0 to 23
+        uint32_t day;      //<! 1 to 31, i.e. 1 based
+        uint32_t month;    //<! 1 to 12, i.e. 1 based
+        uint32_t year;     //<! 0 to YEAR_MAX where 0 = BASE_YEAR
+    } DateTime_t;
+
+    /// A copy of the code in the mbed deepsleep() function but with
+    // under-drive mode to save more power.
+    void underDriveDeepSleep(void);
+
+    /// Add a period in seconds to a DateTime_t struct.
+    // \param pDateTime a pointer to the DateTime_t struct.
+    // \param periodSeconds the period to add to it.
+    void addPeriod(LowPower::DateTime_t * pDateTime, time_t periodSeconds);
+
+    /// Set alarm A on the RTC.
+    // \param pDateTime a pointer to the DateTime_t struct containing the alarm time.
+    // \return true if successful, otherwise false.
+    bool setAlarmA(const LowPower::DateTime_t * pDateTime);
+
+    /// Set an alarm for a number of seconds in the future.
+    // \param periodSeconds the number of seconds in the future that the
+    //        alarm should go off.
+    // \return true if successful, otherwise false.
+    bool setRtcAlarm(time_t periodSeconds);
+
+    /// Return the number of days in a month, taking into account Feb.
+    // \param month the month, between 1 and 12.
+    // \param year the calendar year that the month is in
+    //        (i.e. 2000 means the year 2000).
+    // \return the number of days in the month.
+    uint8_t daysInMonth(uint8_t month, uint32_t year);
+
+    /// Determine if a given year is a leap year.
+    // \param year the year.
+    // \return true if it is a leap year, otherwise false.
+    bool isLeapYear(uint32_t year);
 };
 
 #endif

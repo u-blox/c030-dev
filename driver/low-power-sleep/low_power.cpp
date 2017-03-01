@@ -38,7 +38,11 @@
 // definition for NULL.  So it's simpler to just extern these directly.
 extern "C"
 {
+    /// Suspend function from RTX.
+    // \return the suspend time in microseconds.
     uint32_t rt_suspend (void);
+    /// Resume function from RTX.
+    // \param sleep_time the time that RTX was suspended in microseconds.
     void rt_resume (uint32_t sleep_time);
 }
 
@@ -314,6 +318,7 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool enableInterrupts)
     
     if (!enableInterrupts) {
         // Disable unnecessary interrupts
+        // TODO
     }
         
     // Sleep until the time is right
@@ -342,6 +347,7 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool enableInterrupts)
     
     if (!enableInterrupts) {
         // Restore interrupts
+        // TODO
     }
     
     return success;

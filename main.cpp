@@ -32,8 +32,9 @@
 #define LTC2943_RSENSE_MOHM 68
 
 // Required for UTM board
+#ifdef TARGET_UBLOX_C027
 static DigitalOut i2CPullUpBar(P1_1, 0);
- 
+#endif 
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------

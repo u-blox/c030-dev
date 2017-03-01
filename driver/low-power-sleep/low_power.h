@@ -97,12 +97,12 @@ protected:
     // of the RTC hardware that this class
     // is interested in.
     typedef struct {
-        uint32_t second;   //<! 0 to 59
-        uint32_t minute;   //<! 0 to 59
-        uint32_t hour;     //<! 0 to 23
-        uint32_t day;      //<! 1 to 31, i.e. 1 based
-        uint32_t month;    //<! 1 to 12, i.e. 1 based
-        uint32_t year;     //<! 0 to YEAR_MAX where 0 = BASE_YEAR
+        uint32_t second;   ///< 0 to 59
+        uint32_t minute;   ///< 0 to 59
+        uint32_t hour;     ///< 0 to 23
+        uint32_t day;      ///< 1 to 31, i.e. 1 based
+        uint32_t month;    ///< 1 to 12, i.e. 1 based
+        uint32_t year;     ///< 0 to YEAR_MAX where 0 = BASE_YEAR
     } DateTime_t;
 
     /// A copy of the code in the mbed deepsleep() function but with

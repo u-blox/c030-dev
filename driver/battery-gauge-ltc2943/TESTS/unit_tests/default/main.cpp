@@ -6,6 +6,10 @@
 
 using namespace utest::v1;
 
+// ----------------------------------------------------------------
+// COMPILE-TIME MACROS
+// ----------------------------------------------------------------
+
 // Pick some sensible minimum and maximum numbers
 #define MAX_TEMPERATURE_READING_C  80
 #define MIN_TEMPERATURE_READING_C -20
@@ -75,10 +79,20 @@ using namespace utest::v1;
 #define PIN_I2C_SDC P0_28
 #endif
 
+// ----------------------------------------------------------------
+// PRIVATE VARIABLES
+// ----------------------------------------------------------------
+
+#ifdef TARGET_UBLOX_C027
 // This required only for UTM board
 static DigitalOut gI2CPullUpBar(P1_1, 0);
+#endif
 // I2C interface
 I2C * gpI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SDC);
+
+// ----------------------------------------------------------------
+// TESTS
+// ----------------------------------------------------------------
 
 // Test that the LTC2943 battery gauge can be initialised
 void test_init() {
@@ -708,6 +722,10 @@ void test_charge_low() {
     TEST_ASSERT_FALSE(pBatteryGauge->isChargeLowSet());
 }
 
+// ----------------------------------------------------------------
+// TEST ENVIRONMENT
+// ----------------------------------------------------------------
+
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea, timeout is long enough to run these tests with
@@ -736,6 +754,10 @@ Case cases[] = {
 };
 
 Specification specification(test_setup, cases);
+
+// ----------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------
 
 // Entry point into the tests
 int main() {    

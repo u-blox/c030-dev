@@ -6,6 +6,10 @@
 
 using namespace utest::v1;
 
+// ----------------------------------------------------------------
+// COMPILE-TIME MACROS
+// ----------------------------------------------------------------
+
 // Pick some sensible minimum and maximum numbers
 #define MAX_TEMPERATURE_READING_C  80
 #define MIN_TEMPERATURE_READING_C -20
@@ -30,13 +34,24 @@ using namespace utest::v1;
 // that we can handle in one go
 #define MAX_CONFIG_BLOCK_SIZE 32
 
+// ----------------------------------------------------------------
+// PRIVATE VARIABLES
+// ----------------------------------------------------------------
+
+#ifdef TARGET_UBLOX_C027
+#error GOT HERE
 // This required only for UTM board
 static DigitalOut gI2CPullUpBar(P1_1, 0);
+#endif
 // I2C interface
 I2C * gpI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SDC);
 
 // An empty array, so that we can check for emptiness
 static const char zeroArray[MAX_CONFIG_BLOCK_SIZE] = {0};
+
+// ----------------------------------------------------------------
+// PRIVATE FUNCTIONS
+// ----------------------------------------------------------------
 
 // Print a buffer as a nice hex string
 static void printBytesAsHex(const char * pBuf, uint32_t size)
@@ -59,6 +74,10 @@ static void printBytesAsHex(const char * pBuf, uint32_t size)
         printf("\n");
     }
 }
+
+// ----------------------------------------------------------------
+// TESTS
+// ----------------------------------------------------------------
 
 // Test that the BQ27441 battery gauge can be initialised
 void test_init() {
@@ -531,6 +550,10 @@ void test_advanced_reset() {
     TEST_ASSERT(memcmp (&(data1[0]), &(data3[0]), sizeof (data1)) == 0);
 }
 
+// ----------------------------------------------------------------
+// TEST ENVIRONMENT
+// ----------------------------------------------------------------
+
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea, timeout is long enough to run these tests with
@@ -561,6 +584,10 @@ Case cases[] = {
 };
 
 Specification specification(test_setup, cases);
+
+// ----------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------
 
 // Entry point into the tests
 int main() {    

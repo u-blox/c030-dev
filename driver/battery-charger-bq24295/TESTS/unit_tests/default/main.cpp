@@ -6,6 +6,10 @@
 
 using namespace utest::v1;
 
+// ----------------------------------------------------------------
+// COMPILE-TIME MACROS
+// ----------------------------------------------------------------
+
 // Minimum and maximum numbers
 #define MAX_INPUT_VOLTAGE_LIMIT_MV  5080
 #define MIN_INPUT_VOLTAGE_LIMIT_MV  3880
@@ -39,10 +43,20 @@ using namespace utest::v1;
 #define PIN_I2C_SDC P0_28
 #endif
 
+// ----------------------------------------------------------------
+// PRIVATE VARIABLES
+// ----------------------------------------------------------------
+
+#ifdef TARGET_UBLOX_C027
 // This required only for UTM board
 static DigitalOut gI2CPullUpBar(P1_1, 0);
+#endif
 // I2C interface
 I2C * gpI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SDC);
+
+// ----------------------------------------------------------------
+// TESTS
+// ----------------------------------------------------------------
 
 // Test that the BQ24295 battery charger can be initialised
 void test_init() {
@@ -877,6 +891,10 @@ void test_advanced() {
     TEST_ASSERT(pBatteryCharger->advancedSet(address, originalValue));    
 }
 
+// ----------------------------------------------------------------
+// TEST ENVIRONMENT
+// ----------------------------------------------------------------
+
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea, timeout is long enough to run these tests with
@@ -907,6 +925,10 @@ Case cases[] = {
 };
 
 Specification specification(test_setup, cases);
+
+// ----------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------
 
 // Entry point into the tests
 int main() {    

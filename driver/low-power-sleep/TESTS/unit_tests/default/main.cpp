@@ -38,8 +38,8 @@ public:
     bool publicSetRtcAlarm(time_t periodSeconds);
     bool publicIsLeapYear(uint32_t year);
     
-    // Convert a PublicDateTime_t struct into seconds since 1990
-    time_t dateTimeToSecondsSince1990(SubLowPower::PublicDateTime_t * pDateTime);
+    // Convert a PublicDateTime_t struct into seconds since 1968
+    time_t dateTimeToSecondsSince1968(SubLowPower::PublicDateTime_t * pDateTime);
     
 protected:
 };
@@ -55,10 +55,10 @@ uint32_t const gLeapYears[] = {1904, 1908, 1912, 1916, 1920, 1924, 1928, 1932, \
                                2000, 2004, 2008, 2012, 2016, 2020};
 
 // Days in each month
-uint8_t gDaysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+uint8_t const gDaysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 // My sub-class
-SubLowPower *gSubLowPower = new SubLowPower();
+SubLowPower *gpSubLowPower = new SubLowPower();
 
 // ----------------------------------------------------------------
 // PRIVATE FUNCTIONS
@@ -101,7 +101,7 @@ bool SubLowPower::publicIsLeapYear(uint32_t year)
 }
 
 // Convert a PublicDateTime_t struct into seconds since BASE_YEAR
-time_t SubLowPower::dateTimeToSecondsSince1990(SubLowPower::PublicDateTime_t * pDateTime) {
+time_t SubLowPower::dateTimeToSecondsSince1968(SubLowPower::PublicDateTime_t * pDateTime) {
     time_t periodSeconds = 0;
     
     if (pDateTime != NULL) {
@@ -120,14 +120,14 @@ time_t SubLowPower::dateTimeToSecondsSince1990(SubLowPower::PublicDateTime_t * p
         periodSeconds += pDateTime->year * 60 * 60 * 24 * 365;
         // Sort out the extra days due to previous leap years
         for (uint32_t x = 0; x < pDateTime->year; x++) {
-            if (gSubLowPower->publicIsLeapYear(x + BASE_YEAR)) {
+            if (gpSubLowPower->publicIsLeapYear(x + BASE_YEAR)) {
                 periodSeconds += 60 * 60 * 24;
             }
         }
         // Sort out the month
         for (uint8_t x = 0; x < pDateTime->month - 1; x++) { // -1 'cos it is 1 based
             periodSeconds += gDaysInMonth[x] * 60 * 60 * 24;
-            if ((x == 1) && gSubLowPower->publicIsLeapYear(pDateTime->year + BASE_YEAR)) {
+            if ((x == 1) && gpSubLowPower->publicIsLeapYear(pDateTime->year + BASE_YEAR)) {
                 periodSeconds += 60 * 60 * 24;
             }
         }
@@ -153,9 +153,9 @@ void test_leap_year() {
         }
         
         if (found) {
-            TEST_ASSERT(gSubLowPower->publicIsLeapYear(x));
+            TEST_ASSERT(gpSubLowPower->publicIsLeapYear(x));
         } else {
-            TEST_ASSERT_FALSE(gSubLowPower->publicIsLeapYear(x));
+            TEST_ASSERT_FALSE(gpSubLowPower->publicIsLeapYear(x));
         }
     }        
 }
@@ -164,7 +164,7 @@ void test_leap_year() {
 void test_add_small_increments() {
     SubLowPower::PublicDateTime_t dateTimeOriginal;
     SubLowPower::PublicDateTime_t dateTime;
-    time_t secondsSince1990;
+    time_t secondsSince1968;
     uint32_t startYear = 2016 - BASE_YEAR;// 2016 was a leap year
     time_t startSeconds;
     time_t incrementSeconds;
@@ -178,13 +178,13 @@ void test_add_small_increments() {
     memcpy (&dateTime, &dateTimeOriginal, sizeof (dateTime));
     
     // Call should not explode if the date/time is NULL
-    gSubLowPower->publicAddPeriod(NULL, 5);
+    gpSubLowPower->publicAddPeriod(NULL, 5);
     
     // Check that our local conversion function does basically the right thing
-    TEST_ASSERT_EQUAL_INT32 (0, gSubLowPower->dateTimeToSecondsSince1990(&dateTimeOriginal));
+    TEST_ASSERT_EQUAL_INT32 (0, gpSubLowPower->dateTimeToSecondsSince1968(&dateTimeOriginal));
     
     // Adding zero should do nothing
-    gSubLowPower->publicAddPeriod(&dateTime, 0);
+    gpSubLowPower->publicAddPeriod(&dateTime, 0);
     TEST_ASSERT (memcmp (&dateTimeOriginal, &dateTime, sizeof (dateTime)) == 0);
     
     // Now run through a leap year and 1 day, in small numbers of seconds increments
@@ -197,7 +197,7 @@ void test_add_small_increments() {
     // leap years
     startSeconds = dateTime.year * 60 * 60 * 24 * 365;
     for (uint32_t x = 0; x < dateTime.year; x++) {
-        if (gSubLowPower->publicIsLeapYear(x + BASE_YEAR)) {
+        if (gpSubLowPower->publicIsLeapYear(x + BASE_YEAR)) {
             startSeconds += 60 * 60 * 24;
         }
     }
@@ -205,24 +205,24 @@ void test_add_small_increments() {
     // Now actually do the incrementing/checking
     while (addedSeconds < 60 * 60 * 24 * 366) {
         // Check
-        secondsSince1990 = gSubLowPower->dateTimeToSecondsSince1990(&dateTime);
-        if (secondsSince1990 != startSeconds + addedSeconds) {
-            printf ("%d seconds since 1990 produces %04d-%02d-%02d %02d:%02d:%02d, which is actually %d seconds since 1990.\n",
-                    startSeconds + addedSeconds, dateTime.year + BASE_YEAR, dateTime.month, dateTime.day, dateTime.hour,
-                    dateTime.minute, dateTime.second, secondsSince1990);
-            TEST_ASSERT_EQUAL_INT32 (startSeconds + addedSeconds, secondsSince1990);
+        secondsSince1968 = gpSubLowPower->dateTimeToSecondsSince1968(&dateTime);
+        if (secondsSince1968 != startSeconds + addedSeconds) {
+            printf ("%d seconds since 1968 produces %04d-%02d-%02d %02d:%02d:%02d, which is actually %d seconds since 1968.\n",
+                    (int) (startSeconds + addedSeconds), (int) dateTime.year + BASE_YEAR, (int) dateTime.month, (int) dateTime.day,
+                    (int) dateTime.hour, (int) dateTime.minute, (int) dateTime.second, (int) secondsSince1968);
+            TEST_ASSERT_EQUAL_INT32 (startSeconds + addedSeconds, secondsSince1968);
         }
         // Increment in the range 0 to 9 seconds
         incrementSeconds = (time_t) (rand() % 10);
         addedSeconds += incrementSeconds;
-        gSubLowPower->publicAddPeriod(&dateTime, incrementSeconds);
+        gpSubLowPower->publicAddPeriod(&dateTime, incrementSeconds);
     }
 }
 
 // Test adding wide ranging random increments to a time/date struct
 void test_add_wide_increments() {
     SubLowPower::PublicDateTime_t dateTime;
-    time_t secondsSince1990;
+    time_t secondsSince1968;
     time_t secondsCheck;
     
     for (uint32_t x = 0; x < NUM_RAND_ITERATIONS; x++) {
@@ -231,16 +231,16 @@ void test_add_wide_increments() {
         dateTime.day = 1;
         dateTime.month = 1;
         // Chose a random number of seconds to add
-        secondsSince1990 = (time_t) (rand() % 0x7FFFFFFF);
+        secondsSince1968 = (time_t) (rand() % 0x7FFFFFFF);
         // Add them
-        gSubLowPower->publicAddPeriod(&dateTime, secondsSince1990);
+        gpSubLowPower->publicAddPeriod(&dateTime, secondsSince1968);
         // Check them
-        secondsCheck = gSubLowPower->dateTimeToSecondsSince1990(&dateTime);
-        if (secondsCheck != secondsSince1990) {
-            printf ("%d seconds since 1990 produces %04d-%02d-%02d %02d:%02d:%02d, which is actually %d seconds since 1990.\n",
-                    secondsSince1990, dateTime.year + BASE_YEAR, dateTime.month, dateTime.day, dateTime.hour,
-                    dateTime.minute, dateTime.second, secondsCheck);
-            TEST_ASSERT_EQUAL_INT32 (secondsSince1990, secondsCheck);
+        secondsCheck = gpSubLowPower->dateTimeToSecondsSince1968(&dateTime);
+        if (secondsCheck != secondsSince1968) {
+            printf ("%d seconds since 1968 produces %04d-%02d-%02d %02d:%02d:%02d, which is actually %d seconds since 1968.\n",
+                    (int) secondsSince1968, (int) dateTime.year + BASE_YEAR, (int) dateTime.month, (int) dateTime.day, (int) dateTime.hour,
+                    (int) dateTime.minute, (int) dateTime.second, (int) secondsCheck);
+            TEST_ASSERT_EQUAL_INT32 (secondsSince1968, secondsCheck);
         }
     }
 }
@@ -249,10 +249,10 @@ void test_add_wide_increments() {
 void test_add_random_starts() {
     SubLowPower::PublicDateTime_t startDateTime;
     SubLowPower::PublicDateTime_t newDateTime;
-    time_t secondsSince1990;
+    time_t secondsSince1968;
     time_t secondsCheck;
-    time_t startSecondsSince1990;
-    time_t newSecondsSince1990;
+    time_t startSecondsSince1968;
+    time_t newSecondsSince1968;
     
     for (uint32_t x = 0; x < NUM_RAND_ITERATIONS; x++) {
         // Set the original to zero (taking into account the 1-based items)
@@ -261,28 +261,44 @@ void test_add_random_starts() {
         startDateTime.month = 1;
         // Add a random number of seconds (the range half of that
         // in test_add_wide_increments() to avoid overflow)
-        secondsSince1990 = (time_t) (rand() % (0x7FFFFFFF / 2));
+        secondsSince1968 = (time_t) (rand() % (0x7FFFFFFF / 2));
         // Add them to create a new start date
-        gSubLowPower->publicAddPeriod(&startDateTime, secondsSince1990);
-        startSecondsSince1990 = gSubLowPower->dateTimeToSecondsSince1990(&startDateTime);
+        gpSubLowPower->publicAddPeriod(&startDateTime, secondsSince1968);
+        startSecondsSince1968 = gpSubLowPower->dateTimeToSecondsSince1968(&startDateTime);
         memcpy (&newDateTime, &startDateTime, sizeof (newDateTime));
         
         // Now add a new random number to that start date
-        secondsSince1990 = (time_t) (rand() % (0x7FFFFFFF / 2));
-        gSubLowPower->publicAddPeriod(&newDateTime, secondsSince1990);
-        newSecondsSince1990 = gSubLowPower->dateTimeToSecondsSince1990(&newDateTime);
+        secondsSince1968 = (time_t) (rand() % (0x7FFFFFFF / 2));
+        gpSubLowPower->publicAddPeriod(&newDateTime, secondsSince1968);
+        newSecondsSince1968 = gpSubLowPower->dateTimeToSecondsSince1968(&newDateTime);
         
         // Check the result
-        secondsCheck = newSecondsSince1990 - startSecondsSince1990;
-        if (secondsCheck != secondsSince1990) {
-            printf ("Adding %d seconds since 1990 to %04d-%02d-%02d %02d:%02d:%02d (%d seconds) produces %04d-%02d-%02d %02d:%02d:%02d (%d seconds), which is actually %d seconds difference.\n",
-                    secondsSince1990, startDateTime.year + BASE_YEAR, startDateTime.month, startDateTime.day, startDateTime.hour,
-                    startDateTime.minute, startDateTime.second, startSecondsSince1990,
-                    newDateTime.year + BASE_YEAR, newDateTime.month, newDateTime.day, newDateTime.hour,
-                    newDateTime.minute, newDateTime.second, newSecondsSince1990, secondsCheck);
-            TEST_ASSERT_EQUAL_INT32 (secondsSince1990, secondsCheck);
+        secondsCheck = newSecondsSince1968 - startSecondsSince1968;
+        if (secondsCheck != secondsSince1968) {
+            printf ("Adding %d seconds since 1968 to %04d-%02d-%02d %02d:%02d:%02d (%d seconds) produces %04d-%02d-%02d %02d:%02d:%02d (%d seconds), which is actually %d seconds difference.\n",
+                    (int) secondsSince1968, (int) startDateTime.year + BASE_YEAR, (int) startDateTime.month, (int) startDateTime.day, (int) startDateTime.hour,
+                    (int) startDateTime.minute, (int) startDateTime.second, (int) startSecondsSince1968,
+                    (int) newDateTime.year + BASE_YEAR, (int) newDateTime.month, (int) newDateTime.day, (int) newDateTime.hour,
+                    (int) newDateTime.minute, (int) newDateTime.second, (int) newSecondsSince1968, (int) secondsCheck);
+            TEST_ASSERT_EQUAL_INT32 (secondsSince1968, secondsCheck);
         }
     }
+}
+
+// Test Stop mode
+void test_stop_mode() {
+    
+    // Set the time to get the RTC running
+    set_time(0);
+    
+    // First test a short stop using the static low power entity
+    TEST_ASSERT(gpSubLowPower->enterStop(5));
+    
+    // Instantiate a local low power entity and test that also
+    //LowPower *lp = new LowPower();
+    //TEST_ASSERT(lp->enterStop(5));
+    wait_ms(100);
+    printf("Printing something to flush UART of rubbish.");
 }
 
 // ----------------------------------------------------------------
@@ -299,9 +315,10 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 // Test cases
 Case cases[] = {
     Case("Leap year", test_leap_year),
-    Case("Add period (small increments, takes 50 seconds)", test_add_small_increments),
-    Case("Add period (wide ranging increments)", test_add_wide_increments),
-    Case("Add period (random start dates)", test_add_random_starts)
+    //Case("Add period (small increments for > 1 year, takes 50 seconds)", test_add_small_increments),
+    //Case("Add period (wide ranging increments)", test_add_wide_increments),
+    //Case("Add period (random start dates)", test_add_random_starts),
+    Case("Stop mode", test_stop_mode)
 };
 
 Specification specification(test_setup, cases);

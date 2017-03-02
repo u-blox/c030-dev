@@ -18,6 +18,7 @@
 #include "battery_charger_bq24295.h"
 #include "battery_gauge_bq27441.h"
 #include "battery_gauge_ltc2943.h"
+#include "low_power.h"
 
 /**
  * @file main.cpp
@@ -42,10 +43,11 @@ static DigitalOut i2CPullUpBar(P1_1, 0);
 #if 0
 int main()
 {
-    BatteryChargerBq24295 * pBatteryCharger = NULL;
-    BatteryGaugeBq27441 * pBatteryGaugeBq27441 = NULL;
-    BatteryGaugeLtc2943 * pBatteryGaugeLtc2943 = NULL;
-    I2C * pI2C = NULL;
+    LowPower *pLowPower = new LowPower();
+    BatteryChargerBq24295 *pBatteryCharger = NULL;
+    BatteryGaugeBq27441 *pBatteryGaugeBq27441 = NULL;
+    BatteryGaugeLtc2943 *pBatteryGaugeLtc2943 = NULL;
+    I2C *pI2C = NULL;
     bool chargerSuccess = false;
     bool gaugeBq27441Success = false;
     bool gaugeLtc2943Success = false;
@@ -92,6 +94,17 @@ int main()
 
     if (chargerSuccess && gaugeBq27441Success && gaugeLtc2943Success) {
         printf ("BQ24295 battery charger, BQ27441 battery gauge and LTC2943 battery gauge ready.\n");
+        
+        // Set the time to start the RTC
+        set_time(0);
+        
+        while (1) {
+            printf ("Entering Stop mode for 5 seconds...");
+            // Let the printf leave the building
+            wait_ms(100);
+            pLowPower->enterStop(5);
+            printf (" awake now.\n");
+        }
     }
     
     return 0;

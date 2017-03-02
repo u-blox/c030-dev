@@ -21,7 +21,7 @@
  */
 
 // Define this to print debug information
-//#define DEBUG_LOW_POWER
+#define DEBUG_LOW_POWER
 
 #include <mbed.h>
 #include <stm32f4xx_hal_rtc.h>
@@ -69,21 +69,42 @@ extern "C"
 // the STM HAL calls use to mediate access to the hardware).
 static RTC_HandleTypeDef gRtcHandle;
 
-/// A flag that we can check to see if we have already been active
+/// A flag that we can check to see if we have already been active.
 BACKUP_SRAM
 static uint8_t gAlreadyActive;
 
-/// The number of days in a month, used when working out the alarm time
+/// The number of days in a month, used when working out the alarm time.
 static const uint8_t gDaysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+#ifdef DEBUG_LOW_POWER
+/// LED to flash when the alarm interrupt goes off.
+static DigitalOut gDebugLed(LED1, 1);
+#endif
+
+// ----------------------------------------------------------------
+// INTERRUPT FUNCTION
+// ----------------------------------------------------------------
+
+/// Interrupt callback for RTC Alarm A, replaces weakly
+// linked function in stm32f4xx_hal_rtc.c.
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *rtcHandle)
+{
+#ifdef DEBUG_LOW_POWER
+    gDebugLed = 0;
+#endif
+    (void)rtcHandle;
+}
 
 // ----------------------------------------------------------------
 // GENERIC PRIVATE FUNCTIONS
 // ----------------------------------------------------------------
 
-/// A copy of the mbed deepsleep() function but with under-drive
-// mode and ensuring that flash is powered down to save more power.
-void LowPower::underDriveDeepSleep(void)
+/// A copy of the mbed deepsleep() function but ensuring
+// that flash is powered down to save more power.
+uint32_t LowPower::myDeepSleep(void)
 {
+    uint32_t sleepTimeRtx = 0;
+    
     // Stop HAL systick
     HAL_SuspendTick();
 
@@ -103,8 +124,8 @@ void LowPower::underDriveDeepSleep(void)
 #else /* TARGET_STM32L4 */
     // These are the lines modified from deepsleep();
     HAL_PWREx_EnableFlashPowerDown();
-    //HAL_PWREx_EnableLowRegulatorLowVoltage();
     HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_UNDERDRIVE_ON, PWR_STOPENTRY_WFI);
+    HAL_PWREx_DisableFlashPowerDown();
 #endif /* TARGET_STM32L4 */
 
     // Restart HAL systick
@@ -116,6 +137,9 @@ void LowPower::underDriveDeepSleep(void)
 #if DEVICE_LOWPOWERTIMER
     rtc_synchronize();
 #endif
+
+    // TODO: calculate the real sleepTimeRtx
+    return sleepTimeRtx;
 }
 
 /// Add a period in seconds to a DateTime_t struct.
@@ -126,8 +150,8 @@ void LowPower::addPeriod(LowPower::DateTime_t * pDateTime, time_t periodSeconds)
     
     if ((pDateTime != NULL) && (pDateTime->year <= YEAR_MAX)) {
 #ifdef DEBUG_LOW_POWER
-        printf ("Adding %d seconds to %04d-%02d-%02d %02d:%02d:%02d.\n", periodSeconds, 
-                pDateTime->year + BASE_YEAR, pDateTime->month, pDateTime->day, pDateTime->hour, pDateTime->minute, pDateTime->second);
+        printf ("LowPower: adding %d second(s) to %04d-%02d-%02d %02d:%02d:%02d.\n", (int) periodSeconds, 
+                (int) pDateTime->year + BASE_YEAR, (int) pDateTime->month, (int) pDateTime->day, (int) pDateTime->hour, (int) pDateTime->minute, (int) pDateTime->second);
 #endif
         MBED_ASSERT (pDateTime->second < 60);
         MBED_ASSERT (pDateTime->minute < 60);
@@ -178,8 +202,8 @@ void LowPower::addPeriod(LowPower::DateTime_t * pDateTime, time_t periodSeconds)
         
         // That should be it, the days handle themselves
 #ifdef DEBUG_LOW_POWER
-        printf ("Result is %04d-%02d-%02d %02d:%02d:%02d.\n", pDateTime->year + BASE_YEAR, pDateTime->month,
-                pDateTime->day, pDateTime->hour, pDateTime->minute, pDateTime->second);
+        printf ("LowPower: result is %04d-%02d-%02d %02d:%02d:%02d.\n", (int) pDateTime->year + BASE_YEAR, (int) pDateTime->month,
+                (int) pDateTime->day, (int) pDateTime->hour, (int) pDateTime->minute, (int) pDateTime->second);
 #endif
     }
 }
@@ -193,18 +217,20 @@ bool LowPower::setAlarmA(const LowPower::DateTime_t * pDateTime)
     alarm.AlarmTime.Minutes = pDateTime->minute;
     alarm.AlarmTime.Hours = pDateTime->hour;
     alarm.AlarmTime.TimeFormat = RTC_HOURFORMAT_24;
-    alarm.AlarmMask = RTC_ALARMMASK_NONE;  // No masking, all matter
-    alarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL; // Subseconds masked out (they don't matter)
-    alarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_WEEKDAY; // Day of week masked out (just the date matters)
+    alarm.AlarmMask = RTC_ALARMMASK_NONE;  // No masking, all of the above matter
+    alarm.AlarmTime.SubSeconds = 0; // Must set them to zero as the mask below is ORed with them
+    alarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL; // Subseconds masked (they don't matter)
     alarm.AlarmDateWeekDay = pDateTime->day;
+    alarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE; // Day in the month (rather than day of the week)
     alarm.Alarm = RTC_ALARM_A;
-
+    
 #ifdef DEBUG_LOW_POWER
-    printf ("Setting alarm for: day %02d, time %02d:%02d:%02d.\n", alarm.AlarmDateWeekDay,
+    printf ("LowPower: setting alarm for: day %02d, time %02d:%02d:%02d.\n", alarm.AlarmDateWeekDay,
             alarm.AlarmTime.Hours, alarm.AlarmTime.Minutes, alarm.AlarmTime.Seconds);
+    wait_ms(100); // Let printf leave the building
 #endif
 
-    return (HAL_RTC_SetAlarm(&gRtcHandle, &alarm, RTC_FORMAT_BIN) == HAL_OK);
+    return (HAL_RTC_SetAlarm_IT(&gRtcHandle, &alarm, RTC_FORMAT_BIN) == HAL_OK);
 }
 
 /// Set an alarm for a number of seconds in the future.
@@ -217,11 +243,10 @@ bool LowPower::setRtcAlarm(time_t periodSeconds)
     
     // Get the current time and date
     if (HAL_RTC_GetTime(&gRtcHandle, &timeNow, RTC_FORMAT_BIN) == HAL_OK) {
-        if (HAL_RTC_GetDate(&gRtcHandle, &dateNow, RTC_FORMAT_BIN) == HAL_OK) {
-            
+        if (HAL_RTC_GetDate(&gRtcHandle, &dateNow, RTC_FORMAT_BIN) == HAL_OK) {            
 #ifdef DEBUG_LOW_POWER
-        printf ("Time now is: %04d-%02d-%02d %02d:%02d:%02d.\n", dateNow.Year + BASE_YEAR, dateNow.Month, dateNow.Date,
-                timeNow.Hours, timeNow.Minutes, timeNow.Seconds);
+            printf ("LowPower: time now is: %04d-%02d-%02d %02d:%02d:%02d.\n", dateNow.Year + BASE_YEAR, dateNow.Month, dateNow.Date,
+                    timeNow.Hours, timeNow.Minutes, timeNow.Seconds);
 #endif
             // Add periodSeconds to it
             alarm.second = timeNow.Seconds;
@@ -256,6 +281,14 @@ bool LowPower::isLeapYear(uint32_t year)
     } else {
         isLeapYear = true;
     }
+
+#ifdef DEBUG_LOW_POWER
+    if (isLeapYear) {
+        // printf ("LowPower: %04d is a leap year.\n", (int) year);
+    } else {
+        // printf ("LowPower: %04d is NOT a leap year.\n", (int) year);
+    }
+#endif
 
     return isLeapYear;
 }
@@ -312,36 +345,43 @@ LowPower::~LowPower(void)
 bool LowPower::enterStop(time_t stopPeriodSeconds, bool enableInterrupts)
 {
     bool success = false;
-    time_t startTimeSeconds = time(NULL);
-    time_t alarmPeriodSeconds = stopPeriodSeconds;
-    uint32_t suspendTimeRtos;
+    uint32_t sleepTimeRtx;
+    time_t alarmTimeSeconds = time(NULL) + stopPeriodSeconds;
+    time_t thisSleepSeconds;
     
     if (!enableInterrupts) {
         // Disable unnecessary interrupts
         // TODO
     }
         
-    // Sleep until the time is right
-    while (time(NULL) < startTimeSeconds + stopPeriodSeconds) {
+   // Sleep until the time is right
+    while (time(NULL) < alarmTimeSeconds) {
+        
+        // Assume we will sleep until the alarm time
+        thisSleepSeconds = alarmTimeSeconds - time(NULL);
         
         // If the stop time is longer than the wrap of the 32-bit microsecond
         // timer used by the RTOS, we need to wake up at intermediate points
         // to service that, then return to sleep.  -1 used for margin.
-        if (stopPeriodSeconds > (0xFFFFFFFFU / 1000000U) - 1) {
-            alarmPeriodSeconds = (0xFFFFFFFFU / 1000000U) - 1;
+        if (thisSleepSeconds > (time_t) (0xFFFFFFFFU / 1000000U) - 1) {
+            thisSleepSeconds = (0xFFFFFFFFU / 1000000U) - 1;
         }
         
         // Set the RTC alarm
-        success = setRtcAlarm (alarmPeriodSeconds);
+        success = setRtcAlarm (thisSleepSeconds);
         if (success) {
             // Suspend the RTOS
-            suspendTimeRtos = rt_suspend();
-        
+            // No RTOS calls (including anything to
+            // do with time) must be made until
+            // rt_resume() is called.
+            // TODO figure out why calling this mucks things up
+            //rt_suspend();
+
             // Now enter Stop mode
-            underDriveDeepSleep();
+            sleepTimeRtx = myDeepSleep();
             
             // Resume RTOS operations
-            rt_resume(suspendTimeRtos);
+            rt_resume(sleepTimeRtx);
         }
     }
     
@@ -356,8 +396,6 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool enableInterrupts)
 /// Enter Standby mode.
 void LowPower::enterStandby(time_t standbyPeriodSeconds, bool powerDownBackupSram)
 {
-    time_t startTimeSeconds = time(NULL);
-    
     if (standbyPeriodSeconds > 0) {
         // Set the backup regulator (for backup SRAM) into the right state
         if (powerDownBackupSram) {

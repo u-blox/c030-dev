@@ -88,7 +88,7 @@ public:
 protected:
 
     /// The calendar year represented by our earliest date/time.
-#   define BASE_YEAR 1990
+#   define BASE_YEAR 1968
     /// A limit placed on us by the RTC.
 #   define YEAR_MAX 99
 
@@ -106,8 +106,9 @@ protected:
     } DateTime_t;
 
     /// A copy of the code in the mbed deepsleep() function but with
-    // under-drive mode to save more power.
-    void underDriveDeepSleep(void);
+    // flash powered down to save more power.
+    // \return true the period for which we have slept in RTX units.
+    uint32_t myDeepSleep(void);
 
     /// Add a period in seconds to a DateTime_t struct.
     // \param pDateTime a pointer to the DateTime_t struct.

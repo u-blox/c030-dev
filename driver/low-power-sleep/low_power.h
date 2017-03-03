@@ -107,6 +107,14 @@ protected:
     // \param pAlarmStruct pointer to a tm struct representing the alarm time.
     // \return true if successful, otherwise false.
     bool setRtcAlarm(struct tm * pAlarmStruct);
+    
+    // Disable the user interrupts.
+    // \param pInterruptsActive pointer to an array of bools that will be
+    //        filled with true were an interrupt was active, othewise false.
+    // \param numInterruptsActive the number of elements in the pInterruptsActive
+    //        array.
+    // \return the number of interrupts that were disabled.
+    uint32_t disableUserInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive);
 };
 
 #endif

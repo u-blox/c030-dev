@@ -103,6 +103,38 @@ bool LowPower::setRtcAlarm(struct tm * pAlarmStruct)
     return (HAL_RTC_SetAlarm_IT(&gRtcHandle, &alarm, RTC_FORMAT_BIN) == HAL_OK);
 }
 
+// Disable the user interrupts.
+uint32_t LowPower::disableUserInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive)
+{
+    uint32_t numInterruptsDisabled = 0;
+    
+    memset (pInterruptsActive, false, numInterruptsActive);
+    
+#ifdef DEBUG_LOW_POWER
+    printf ("Disabling interrupts...");
+#endif
+    
+    for (uint32_t x = 0; x < numInterruptsActive; x++) {
+        if (NVIC_GetActive((IRQn_Type) x)) {
+            *(pInterruptsActive + x) = true;
+            NVIC_ClearPendingIRQ((IRQn_Type) x);
+            NVIC_DisableIRQ((IRQn_Type) x);
+            numInterruptsDisabled++;
+#ifdef DEBUG_LOW_POWER
+            printf (" %d", x);
+#endif
+        }
+    }
+    
+#ifdef DEBUG_LOW_POWER
+    if (numInterruptsDisabled == 0) {
+        printf (" (none were enabled)");
+    }
+#endif
+    
+    return numInterruptsDisabled;
+}
+
 //----------------------------------------------------------------
 // PUBLIC FUNCTIONS
 // ----------------------------------------------------------------
@@ -143,15 +175,14 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool disableInterrupts)
     time_t alarmTimeSeconds = sleepTimeSeconds + stopPeriodSeconds;
     struct tm *pAlarmStruct;
     bool interruptActive[NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET] = {false};
-    
+    uint32_t numInterruptsDisabled = 0;
+
     // Disable unnecessary interrupts
     if (disableInterrupts) {
-        for (uint32_t x = 0; x < sizeof (interruptActive) / sizeof (interruptActive[0]); x++) {
-            if (NVIC_GetActive((IRQn_Type) x)) {
-                interruptActive[x] = true;
-                NVIC_DisableIRQ((IRQn_Type) x);
-            }
-        }
+        numInterruptsDisabled = disableUserInterrupts(&(interruptActive[0]), sizeof (interruptActive) / sizeof (interruptActive[0]));
+#ifdef DEBUG_LOW_POWER
+        printf ("\nMaking sure the RTC interrupt is enabled.\n");
+#endif
         NVIC_EnableIRQ(RTC_WKUP_IRQn);
     }
 
@@ -196,12 +227,15 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool disableInterrupts)
     }
     
     // Re-enable those unnecessary interrupts
-    if (disableInterrupts) {
+    if (numInterruptsDisabled > 0) {
         for (uint32_t x = 0; x < sizeof (interruptActive) / sizeof (interruptActive[0]); x++) {
             if (interruptActive[x]) {
                 NVIC_EnableIRQ((IRQn_Type) x);
             }
         }
+#ifdef DEBUG_LOW_POWER
+        printf ("Re-enabled the user interrupts previously disabled.\n");
+#endif
     }
         
     return success;

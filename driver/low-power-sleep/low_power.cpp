@@ -59,6 +59,13 @@ extern "C"
 /// Size of backup SRAM.
 #define BACKUP_SRAM_SIZE 4096
 
+#if defined (TARGET_LIKE_CORTEX_M4) && defined (NVIC_NUM_VECTORS) && defined (NVIC_USER_IRQ_OFFSET)
+/// Only if NVIC_NUM_VECTORS and NVIC_USER_IRQ_OFFSET are defined is
+// it possbile to disable interrupts and, until CMSIS 5 comes along, we only have
+// the NVIC_GetEnableIRQ() macro for M4 cores.
+#define CAN_DISABLE_INTERRUPTS
+#endif
+
 // ----------------------------------------------------------------
 // PRIVATE VARIABLES
 // ----------------------------------------------------------------
@@ -75,8 +82,18 @@ static DigitalOut gDebugLed(LED1, 1);
 #endif
 
 // ----------------------------------------------------------------
-// GENERIC PRIVATE FUNCTIONS
+// PRIVATE FUNCTIONS
 // ----------------------------------------------------------------
+
+/// Check whether an interrupt is enabled or not.
+inline uint32_t LowPower::myNVIC_GetEnableIRQ(IRQn_Type IRQn)
+{
+    if ((int32_t)(IRQn) >= 0) {
+        return((uint32_t)(((NVIC->ISER[(((uint32_t)(int32_t)IRQn) >> 5UL)] & (1UL << (((uint32_t)(int32_t)IRQn) & 0x1FUL))) != 0UL) ? 1UL : 0UL));
+    } else {
+        return(0U);
+    }
+}
 
 /// Set an alarm for a given time.
 bool LowPower::setRtcAlarm(struct tm * pAlarmStruct)
@@ -104,7 +121,7 @@ bool LowPower::setRtcAlarm(struct tm * pAlarmStruct)
 }
 
 // Disable the user interrupts.
-uint32_t LowPower::disableUserInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive)
+uint32_t LowPower::disableInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive)
 {
     uint32_t numInterruptsDisabled = 0;
     
@@ -115,7 +132,7 @@ uint32_t LowPower::disableUserInterrupts(bool *pInterruptsActive, uint32_t numIn
 #endif
     
     for (uint32_t x = 0; x < numInterruptsActive; x++) {
-        if (NVIC_GetActive((IRQn_Type) x)) {
+        if (myNVIC_GetEnableIRQ((IRQn_Type) x)) {
             *(pInterruptsActive + x) = true;
             NVIC_ClearPendingIRQ((IRQn_Type) x);
             NVIC_DisableIRQ((IRQn_Type) x);
@@ -168,61 +185,69 @@ LowPower::~LowPower(void)
 }
 
 /// Enter Stop mode.
-bool LowPower::enterStop(time_t stopPeriodSeconds, bool disableInterrupts)
+bool LowPower::enterStop(time_t stopPeriodSeconds, bool disableUserInterrupts)
 {
-    bool success = false;
+    bool success = true;
     time_t sleepTimeSeconds = time(NULL);
     time_t alarmTimeSeconds = sleepTimeSeconds + stopPeriodSeconds;
     struct tm *pAlarmStruct;
-    bool interruptActive[NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET] = {false};
     uint32_t numInterruptsDisabled = 0;
-
-    // Disable unnecessary interrupts
-    if (disableInterrupts) {
-        numInterruptsDisabled = disableUserInterrupts(&(interruptActive[0]), sizeof (interruptActive) / sizeof (interruptActive[0]));
-#ifdef DEBUG_LOW_POWER
-        printf ("\nMaking sure the RTC interrupt is enabled.\n");
+#ifdef CAN_DISABLE_INTERRUPTS
+    bool interruptActive[NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET] = {false};
 #endif
+
+    // Disable unnecessary user interrupts
+    if (disableUserInterrupts) {
+#ifdef CAN_DISABLE_INTERRUPTS
+        numInterruptsDisabled = disableInterrupts(&(interruptActive[0]), sizeof (interruptActive) / sizeof (interruptActive[0]));
+# ifdef DEBUG_LOW_POWER
+        printf ("\nMaking sure the RTC interrupt is enabled.\n");
+# endif
         NVIC_EnableIRQ(RTC_WKUP_IRQn);
+#else
+        success = false;
+#endif
     }
 
-   // Sleep until the time is right
-    while (time(NULL) < alarmTimeSeconds) {
-        // Update the time
-        sleepTimeSeconds = time(NULL);
-        
-        // If the stop period is longer than the wrap of the 32-bit tick used
-        // by the RTOS, we need to wake up at intermediate points to service
-        // that, then return to sleep.  -1 used for margin.
-        if (alarmTimeSeconds - sleepTimeSeconds > (time_t) (0xFFFFFFFFU / osKernelSysTickFrequency) - 1) {
-            alarmTimeSeconds = (0xFFFFFFFFU / osKernelSysTickFrequency) - 1 + sleepTimeSeconds;
-        }
-        
-        // Set the RTC alarm
-        pAlarmStruct = localtime (&alarmTimeSeconds);
-        success = setRtcAlarm (pAlarmStruct);
-        
+    // Sleep until the time is right
+    if (success) {
+        while ((time(NULL) < alarmTimeSeconds)) {
+            // Update the time
+            sleepTimeSeconds = time(NULL);
+            
+            // If the stop period is longer than the wrap of the 32-bit tick used
+            // by the RTOS, we need to wake up at intermediate points to service
+            // that, then return to sleep.  -1 used for margin.
+            if (alarmTimeSeconds - sleepTimeSeconds > (time_t) (0xFFFFFFFFU / osKernelSysTickFrequency) - 1) {
+                alarmTimeSeconds = (0xFFFFFFFFU / osKernelSysTickFrequency) - 1 + sleepTimeSeconds;
+            }
+            
+            // Set the RTC alarm
+            pAlarmStruct = localtime (&alarmTimeSeconds);
+            success = setRtcAlarm (pAlarmStruct);
+            
 #ifdef DEBUG_LOW_POWER
-        struct tm *pTimeStruct = localtime (&sleepTimeSeconds);
-        printf ("LowPower: sleeping for %d second(s) out of %d (time now is %04d-%02d-%02d %02d:%02d:%02d).\n", 
-                alarmTimeSeconds - sleepTimeSeconds, stopPeriodSeconds, pTimeStruct->tm_year + 1900, pTimeStruct->tm_mon,
-                pTimeStruct->tm_mday, pTimeStruct->tm_hour, pTimeStruct->tm_min, pTimeStruct->tm_sec);
-        wait_ms(100); // Let printf leave the building
+            struct tm *pTimeStruct = localtime (&sleepTimeSeconds);
+            printf ("LowPower: sleeping for %d second(s) out of %d (time now is %04d-%02d-%02d %02d:%02d:%02d).\n", 
+                    alarmTimeSeconds - sleepTimeSeconds, stopPeriodSeconds, pTimeStruct->tm_year + 1900, pTimeStruct->tm_mon,
+                    pTimeStruct->tm_mday, pTimeStruct->tm_hour, pTimeStruct->tm_min, pTimeStruct->tm_sec);
+            wait_ms(100); // Let printf leave the building
 #endif
-        if (success) {
-            // Suspend the RTOS
-            // No RTOS calls (including anything to do with time) must be made until
-            // rt_resume() is called.
-            // TODO figure out why calling this mucks things up
-            // rt_suspend();
+            if (success) {
+                // Suspend the RTOS
+                // No RTOS calls (including anything to do with time) must be made until
+                // rt_resume() is called.
+                // TODO figure out why calling this mucks things up
+                // rt_suspend();
 
-            // Now enter Stop mode, allowing flash to power down
-            HAL_PWREx_EnableFlashPowerDown();
-            deepsleep();
-            HAL_PWREx_DisableFlashPowerDown();
+                // Now enter Stop mode, allowing flash to power down
+                HAL_PWREx_EnableFlashPowerDown();
+                deepsleep();
+                HAL_PWREx_DisableFlashPowerDown();
 
-            // Resume RTOS operations
-            rt_resume(osKernelSysTickMicroSec ((uint64_t) ((uint64_t) time(NULL) - (uint64_t) sleepTimeSeconds) * 1000));
+                // Resume RTOS operations
+                rt_resume(osKernelSysTickMicroSec ((uint64_t) ((uint64_t) time(NULL) - (uint64_t) sleepTimeSeconds) * 1000));
+            }
         }
     }
     
@@ -242,7 +267,7 @@ bool LowPower::enterStop(time_t stopPeriodSeconds, bool disableInterrupts)
 }
 
 /// Enter Standby mode.
-void LowPower::enterStandby(time_t standbyPeriodSeconds, bool disableInterrupts, bool powerDownBackupSram)
+void LowPower::enterStandby(time_t standbyPeriodSeconds, bool disableUserInterrupts, bool powerDownBackupSram)
 {
     time_t alarmTimeSeconds = time(NULL) + standbyPeriodSeconds;
     struct tm *pAlarmStruct;
@@ -255,8 +280,8 @@ void LowPower::enterStandby(time_t standbyPeriodSeconds, bool disableInterrupts,
             HAL_PWREx_EnableBkUpReg();
         }
         
-        // Disable unnecessary interrupts
-        if (disableInterrupts) {
+        // Disable unnecessary user interrupts
+        if (disableUserInterrupts) {
             for (uint32_t x = 0; x < NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET; x++) {
                 if (NVIC_GetActive((IRQn_Type) x)) {
                     NVIC_DisableIRQ((IRQn_Type) x);

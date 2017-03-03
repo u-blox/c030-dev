@@ -68,14 +68,17 @@ public:
     //        It is up to the caller to ensure that the requested
     //        sleep time does not overflow the number of days in the
     //        current calender month.
-    // \param disableInterrupts if true, all user interrupts aside from
+    // \param disableUserInterrupts if true, all user interrupts aside from
     //        the RTC interrupt will be disabled, otherwise it is up to
     //        the caller to disable any interrupts which should not cause
-    //        exit from Stop mode.  Note: during Stop mode the processor is
-    //        running from a 32 kHz clock and so any interrupt that is
-    //        triggered will run correspondingly slower.
+    //        exit from Stop mode.  If this is set to true and it is not
+    //        possible to disable interrupts on your chosen platform then
+    //        this function will return false immediately. Note: during
+    //        Stop mode the processor is running from a 32 kHz clock
+    //        and so any interrupt that is triggered will run correspondingly
+    //        slower.
     // \return true if successful, otherwise false.
-    bool enterStop(time_t stopPeriodSeconds, bool disableInterrupts = false);
+    bool enterStop(time_t stopPeriodSeconds, bool disableUserInterrupts = false);
 
 
     /// Enter Standby mode.  Note that this function does NOT return.  Or
@@ -91,18 +94,26 @@ public:
     //        It is up to the caller to ensure that the requested
     //        sleep time does not overflow the number of days in the
     //        current calender month.
-    // \param disableInterrupts if true, all user interrupts aside from
+    // \param disableUserInterrupts if true, all user interrupts aside from
     //        the RTC interrupt will be disabled, otherwise it is up to
     //        the caller to disable any interrupts which should not cause
-    //        exit from Standby mode.  Note: during Standby mode the processor
-    //        is running from a 32 kHz clock and so any interrupt that is
-    //        triggered will run correspondingly slower.
+    //        exit from Standby mode.  If this is set to true and it is not
+    //        possible to disable interrupts on your chosen platform then
+    //        this function will return false immediately. Note: during
+    //        Standby mode the processor is running from a 32 kHz clock
+    //        and so any interrupt that is triggered will run correspondingly
+    //        slower.
     // \param powerDownBackupSram if true, backup SRAM will also be powered
     //        down in standby mode, otherwise it will be retained.
-    void enterStandby(time_t standbyPeriodSeconds, bool disableInterrupts = false, bool powerDownBackupSram = false);
+    void enterStandby(time_t standbyPeriodSeconds, bool disableUserInterrupts = false, bool powerDownBackupSram = false);
 
 protected:
 
+    /// Check whether an interrupt is enabled or not.  
+    // Note: available in CMSIS 5 but not earlier.  The version here is for
+    // an M4 core.
+    inline uint32_t myNVIC_GetEnableIRQ(IRQn_Type IRQn);
+    
     /// Set an alarm for a number of seconds in the future.
     // \param pAlarmStruct pointer to a tm struct representing the alarm time.
     // \return true if successful, otherwise false.
@@ -114,7 +125,7 @@ protected:
     // \param numInterruptsActive the number of elements in the pInterruptsActive
     //        array.
     // \return the number of interrupts that were disabled.
-    uint32_t disableUserInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive);
+    uint32_t disableInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive);
 };
 
 #endif

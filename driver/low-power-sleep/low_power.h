@@ -17,6 +17,8 @@
 #ifndef LOW_POWER_H
 #define LOW_POWER_H
 
+#include <WakeUp.h>
+
 /**
  * @file low_power.h
  * This file defines a class intended to assist with obtaining lowest power
@@ -53,7 +55,7 @@
 // instance of this class; it is best to instantiate it statically
 // at the top of your code or it can be instantiated once at the
 // top of main().
-class LowPower {
+class LowPower: public WakeUp  {
 public:
 
     /// Constructor.
@@ -62,7 +64,7 @@ public:
     ~LowPower(void);
 
     /// Enter Stop mode.
-    // \param stopPeriodSeconds the amount of time to remain in Stop
+    // \param stopPeriodMilliseconds the amount of time to remain in Stop
     //        mode for.  When the time has expired the function
     //        will return.  The maximum delay is one calender month.
     //        It is up to the caller to ensure that the requested
@@ -78,12 +80,12 @@ public:
     //        and so any interrupt that is triggered will run correspondingly
     //        slower.
     // \return true if successful, otherwise false.
-    bool enterStop(time_t stopPeriodSeconds, bool disableUserInterrupts = false);
+    bool enterStop(uint32_t stopPeriodMilliseconds, bool disableUserInterrupts = false);
 
 
     /// Enter Standby mode.  Note that this function does NOT return.  Or
     // rather, if this function returns, there has been an error.
-    // \param standbyPeriodSeconds the amount of time to remain in Standby
+    // \param standbyPeriodMilliseconds the amount of time to remain in Standby
     //        mode for.  When the time has expired the processor will
     //        be reset and begin execution once more from main().  The
     //        values stored in BACKUP_SRAM will be retained, all other
@@ -105,7 +107,7 @@ public:
     //        slower.
     // \param powerDownBackupSram if true, backup SRAM will also be powered
     //        down in standby mode, otherwise it will be retained.
-    void enterStandby(time_t standbyPeriodSeconds, bool disableUserInterrupts = false, bool powerDownBackupSram = false);
+    void enterStandby(uint32_t standbyPeriodMilliseconds, bool disableUserInterrupts = false, bool powerDownBackupSram = false);
 
 protected:
 
@@ -114,16 +116,16 @@ protected:
     // an M4 core.
     inline uint32_t myNVIC_GetEnableIRQ(IRQn_Type IRQn);
     
-    /// Set an alarm for a number of seconds in the future.
-    // \param pAlarmStruct pointer to a tm struct representing the alarm time.
-    // \return true if successful, otherwise false.
-    bool setRtcAlarm(struct tm * pAlarmStruct);
-    
-    // Disable the user interrupts.
+    // Disable the user interrupts.  The given number of user interrupts,
+    // counting from zero, will be disabled and, if pInterruptsActive is
+    // provided, it will be filled in with true for those user interrupts 
+    // that were active.
     // \param pInterruptsActive pointer to an array of bools that will be
     //        filled with true were an interrupt was active, othewise false.
-    // \param numInterruptsActive the number of elements in the pInterruptsActive
-    //        array.
+    //        If parameter is NULL, disabling of the given number of user
+    //        interrupts will still occur.  There must be space for at least
+    //        numInterruptsActive bools.
+    // \param numInterruptsActive the number of user interrupts to disable.
     // \return the number of interrupts that were disabled.
     uint32_t disableInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive);
 };

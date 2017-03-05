@@ -3,7 +3,7 @@
 #include "unity.h"
 #include "utest.h"
 #include "low_power.h"
-
+ 
 using namespace utest::v1;
 
 // ----------------------------------------------------------------
@@ -97,15 +97,20 @@ static void stopTicker (void)
 // Test Stop mode
 void test_stop_mode() {
     time_t startTime;
+    char buf[32];
     struct tm alarmStruct;
     
     // Set the time to get the RTC running
     set_time(0);
     
+    startTime = time(NULL);
+    strftime(buf, sizeof (buf), "%Y-%m-%d %H:%M:%S", localtime(&startTime));
+    printf ("Time set to %s.\n", buf);
+            
     // First test a short stop
     startTime = time(NULL);
     startTicker();
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS));
+    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000));
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
     stopTicker();
@@ -113,7 +118,7 @@ void test_stop_mode() {
     // Do it again with unnecessary interrupts disabled
     startTime = time(NULL);
     startTicker();
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS, true));
+    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000, true));
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
     stopTicker();
@@ -124,8 +129,10 @@ void test_stop_mode() {
     alarmStruct.tm_sec = 58;
     set_time(mktime(&alarmStruct)); 
     startTime = time(NULL);
+    strftime(buf, sizeof (buf), "%Y-%m-%d %H:%M:%S", localtime(&startTime));
+    printf ("Time set to %s.\n", buf);
     startTicker();    
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS));
+    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000));
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
     stopTicker();

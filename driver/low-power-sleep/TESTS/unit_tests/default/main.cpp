@@ -28,7 +28,7 @@ using namespace utest::v1;
 // ----------------------------------------------------------------
 
 // An instance of low power
-static LowPower *gpLowPower = NULL;
+static LowPower *gpLowPower = new LowPower();
 
 // A ticker
 static Ticker gTicker;
@@ -38,7 +38,7 @@ static uint32_t gTickCount = 0;
 
 // An item to take up all of Backup SRAM
 BACKUP_SRAM
-char gBackupSram[4096];
+static char gBackupSram[4096];
 
 // ----------------------------------------------------------------
 // PRIVATE FUNCTIONS
@@ -218,22 +218,28 @@ Specification specification(test_setup, cases);
 // ----------------------------------------------------------------
 
 int main() {    
-    bool success = false;
+    bool success = true;
     
-    // Create the instance of LowPower
-    gpLowPower = new LowPower();
-
     // If the RTC is running then we must have been
     // in the Standby mode test and have just come back
     // from reset, so check that Backup SRAM has the
     // expected contents
     if (time(NULL) != (time_t) -1) {
-        for (uint32_t x = 0; x < sizeof (gBackupSram); x++) {
-            TEST_ASSERT_EQUAL_UINT8(0x42, gBackupSram[x]);
+        for (uint32_t x = 0; (x < sizeof (gBackupSram)) && success; x++) {
+            if (gBackupSram[x] != 0x42) {
+                success = false;
+            }
         }
+        
+        TEST_ASSERT(success);
+
+        // Now we fake the end of the suite of tests
+        printf ("{{__testcase_finish;Standby mode;%01d;%01d}}\n", success, !success);
+        printf ("{{__testcase_summary;3;%01d}}\n", !success);
+        printf ("{{__exit;%01d}}\n", !success);
+    } else {
+        success = !Harness::run(specification);
     }
-    
-    success = !Harness::run(specification);
     
     return success;
 }

@@ -934,7 +934,6 @@ Specification specification(test_setup, cases);
 int main() {    
     bool success = false;
     
-    srand(time(NULL));
     if (gpI2C != NULL) {        
         success = !Harness::run(specification);
     } else {

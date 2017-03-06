@@ -76,7 +76,7 @@ LowPower::LowPower(void)
     __HAL_RCC_BKPSRAM_CLK_ENABLE();
     
     // Determine if we've already been active
-    if (__HAL_PWR_GET_FLAG(PWR_FLAG_BRR)) {
+    if (!__HAL_PWR_GET_FLAG(PWR_FLAG_BRR)) {
         // If the backup regulator is not running, we've not woken
         // up from Standby with data in there and so we
         // should zero the backup SRAM to clean it up.

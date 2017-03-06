@@ -3,6 +3,7 @@
 #include "unity.h"
 #include "utest.h"
 #include "low_power.h"
+#include <stm32f4xx_hal_tim.h>
  
 using namespace utest::v1;
 
@@ -26,26 +27,22 @@ using namespace utest::v1;
 // PRIVATE VARIABLES
 // ----------------------------------------------------------------
 
-// An instance of low power 
-LowPower *gpLowPower = new LowPower();
+// An instance of low power
+static LowPower *gpLowPower = NULL;
 
 // A ticker
-Ticker gTicker;
+static Ticker gTicker;
 
 // A count of ticks
-uint32_t gTickCount = 0;
+static uint32_t gTickCount = 0;
+
+// An item to take up all of Backup SRAM
+BACKUP_SRAM
+char gBackupSram[4096];
 
 // ----------------------------------------------------------------
 // PRIVATE FUNCTIONS
 // ----------------------------------------------------------------
-
-// Set the pTimeStruct to time zero
-static void earliestTimeStruct(struct tm * pTimeStruct)
-{
-    memset (pTimeStruct, 0, sizeof (*pTimeStruct));
-    pTimeStruct->tm_mday = 1;
-    pTimeStruct->tm_year = 70;
-}
 
 // A ticker function that increments gTickCount
 static void incTickCount(void)
@@ -80,7 +77,7 @@ static void startTicker (void)
 static void stopTicker (void)
 {
     // Stop the ticker
-    gTicker.attach_us (NULL, 0);
+    gTicker.detach();
     
     // Reset counters
     gTickCount = 0;
@@ -97,50 +94,98 @@ static void stopTicker (void)
 // Test Stop mode
 void test_stop_mode() {
     time_t startTime;
-    char buf[32];
-    struct tm alarmStruct;
     
-    // Set the time to get the RTC running
-    set_time(0);
-    
-    startTime = time(NULL);
-    strftime(buf, sizeof (buf), "%Y-%m-%d %H:%M:%S", localtime(&startTime));
-    printf ("Time set to %s.\n", buf);
-            
-    // First test a short stop
+    // Test a short stop
     startTime = time(NULL);
     startTicker();
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000));
+    gpLowPower->enterStop(SLEEP_DURATION_SECONDS * 1000);
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
     stopTicker();
     
-    // Do it again with unnecessary interrupts disabled
+    // Do it again
     startTime = time(NULL);
     startTicker();
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000, true));
+    gpLowPower->enterStop(SLEEP_DURATION_SECONDS * 1000);
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
     stopTicker();
     
-    // Now run through all the corner cases of sleep
-    // boundaries I can think of
-    earliestTimeStruct(&alarmStruct);
-    alarmStruct.tm_sec = 58;
-    set_time(mktime(&alarmStruct)); 
-    startTime = time(NULL);
-    strftime(buf, sizeof (buf), "%Y-%m-%d %H:%M:%S", localtime(&startTime));
-    printf ("Time set to %s.\n", buf);
-    startTicker();    
-    TEST_ASSERT(gpLowPower ->enterStop(SLEEP_DURATION_SECONDS * 1000));
-    TEST_ASSERT_FALSE(tickerExpired());
-    TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
-    stopTicker();
-
     // Let the UART recover after sleep or mbedgt can
     // be confused by partial prints
     wait_ms(100);
-    printf("Printing something to flush UART of rubbish.");
+    printf("Printing something to flush UART of rubbish.\n");
+}
+
+// Test the number of user interrupts that have been enabled
+void test_interrupts_enabled() {
+    int32_t userInterruptsEnabled;
+    uint8_t list[NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET];
+    
+    // Fill with a known value
+    memset(&(list[0]), 0xff, sizeof (list));
+    
+    // Check that we can just get the number back without any parameters
+    userInterruptsEnabled = gpLowPower->numUserInterruptsEnabled();
+    
+#if defined (NVIC_NUM_VECTORS) && defined (NVIC_USER_IRQ_OFFSET)
+# ifdef TARGET_STM
+    TEST_ASSERT_EQUAL_INT32(2, userInterruptsEnabled);
+# endif
+#else
+    TEST_ASSERT_EQUAL_INT32(-1, userInterruptsEnabled);
+#endif
+
+    // Now ask for a list, but only with one entry
+    userInterruptsEnabled = gpLowPower->numUserInterruptsEnabled(&(list[0]), 1);
+    // Check that the second entry is untouched
+    TEST_ASSERT_EQUAL_UINT8(0xff, list[1]);
+#ifdef TARGET_STM
+    // Check that two interrupts are enabled
+    TEST_ASSERT_EQUAL_INT32(2, userInterruptsEnabled);
+    // Check that the first entry is the RTC Alarm interrupt (used by enableStop())
+    TEST_ASSERT_EQUAL_UINT8(RTC_Alarm_IRQn, list[0]);
+#endif
+
+    // Now ask for the full list
+    userInterruptsEnabled = gpLowPower->numUserInterruptsEnabled(&(list[0]), sizeof (list));
+#ifdef TARGET_STM
+    // Check that two interrupts are enabled
+    TEST_ASSERT_EQUAL_INT32(2, userInterruptsEnabled);
+    // Check that the third entry is untouched
+    TEST_ASSERT_EQUAL_UINT8(0xff, list[2]);
+    // Check that the first entry is the RTC Alarm interrupt
+    TEST_ASSERT_EQUAL_UINT8(RTC_Alarm_IRQn, list[0]);
+    // Check that the second entry is the TIM5 interrupt (used for RTOS tick)
+    TEST_ASSERT_EQUAL_UINT8(TIM5_IRQn, list[1]);
+#endif
+}
+
+// Test Standby mode
+void test_standby_mode() {
+#ifdef TARGET_STM
+    // Check that the Backup SRAM array has been placed correctly
+    TEST_ASSERT_EQUAL_UINT32 (0x40024000, &(gBackupSram[0]));
+#endif
+    
+    // Fill backup SRAM with 0x42
+    memset (&(gBackupSram[0]), 0x42, sizeof (gBackupSram));
+    
+    // Test that we succeeded in doing so
+    for (uint32_t x = 0; x < sizeof (gBackupSram); x++) {
+        TEST_ASSERT_EQUAL_INT8(0x42, gBackupSram[x]);
+    }
+
+    startTicker();
+    gpLowPower->enterStandby(SLEEP_DURATION_SECONDS * 1000);
+
+    // The result of this is that the processor will reset and we will
+    // come back again at main().  There we can check if (a) the
+    // right amount of time has expired and (b) Backup SRAM is still as we
+    // left it
+
+    // We should never get here
+    TEST_ASSERT(false);
 }
 
 // ----------------------------------------------------------------
@@ -156,7 +201,14 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 
 // Test cases
 Case cases[] = {
-    Case("Stop mode", test_stop_mode)
+    Case("Stop mode", test_stop_mode),
+    // This must be run second as test_stop_mode is expected to enable some interupts
+    Case("Num user interrupts enabled", test_interrupts_enabled),
+#ifdef TARGET_STM
+    // Standby mode is only implemented for ST micro cores
+    // This must be the last test as it resets us back to main()
+    Case("Standby mode", test_standby_mode)
+#endif
 };
 
 Specification specification(test_setup, cases);
@@ -168,7 +220,19 @@ Specification specification(test_setup, cases);
 int main() {    
     bool success = false;
     
-    srand(time(NULL));
+    // Create the instance of LowPower
+    gpLowPower = new LowPower();
+
+    // If the RTC is running then we must have been
+    // in the Standby mode test and have just come back
+    // from reset, so check that Backup SRAM has the
+    // expected contents
+    if (time(NULL) != (time_t) -1) {
+        for (uint32_t x = 0; x < sizeof (gBackupSram); x++) {
+            TEST_ASSERT_EQUAL_UINT8(0x42, gBackupSram[x]);
+        }
+    }
+    
     success = !Harness::run(specification);
     
     return success;

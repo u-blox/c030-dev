@@ -69,18 +69,14 @@ public:
     //        will return.  The maximum delay is one calender month.
     //        It is up to the caller to ensure that the requested
     //        sleep time does not overflow the number of days in the
-    //        current calender month.
-    // \param disableUserInterrupts if true, all user interrupts aside from
-    //        the RTC interrupt will be disabled, otherwise it is up to
-    //        the caller to disable any interrupts which should not cause
-    //        exit from Stop mode.  If this is set to true and it is not
-    //        possible to disable interrupts on your chosen platform then
-    //        this function will return false immediately. Note: during
-    //        Stop mode the processor is running from a 32 kHz clock
-    //        and so any interrupt that is triggered will run correspondingly
-    //        slower.
-    // \return true if successful, otherwise false.
-    bool enterStop(uint32_t stopPeriodMilliseconds, bool disableUserInterrupts = false);
+    //        current calender month.  This function will disable the RTOS
+    //        tick and so any RTOS timers will be frozen for the duration of
+    //        Stop mode; they will not tick and will not expire during this
+    //        time.  Any other enabled interrupts can bring the processor out of
+    //        Stop mode.  Note: during Stop mode the processor is running
+    //        from a 32 kHz clock and so any interrupt that is triggered
+    //        will run correspondingly slower.
+    void enterStop(uint32_t stopPeriodMilliseconds);
 
 
     /// Enter Standby mode.  Note that this function does NOT return.  Or
@@ -91,43 +87,31 @@ public:
     //        values stored in BACKUP_SRAM will be retained, all other
     //        variables will be reset to their initial state. The RTOS
     //        is suspended on entry to Standby mode (i.e. no RTOS timers
-    //        will expire) and the RTOS will be reset on return to main().
+    //        will run) and the RTOS will be reset on return to main().
     //        The maximum delay is one calender month.
     //        It is up to the caller to ensure that the requested
     //        sleep time does not overflow the number of days in the
     //        current calender month.
-    // \param disableUserInterrupts if true, all user interrupts aside from
-    //        the RTC interrupt will be disabled, otherwise it is up to
-    //        the caller to disable any interrupts which should not cause
-    //        exit from Standby mode.  If this is set to true and it is not
-    //        possible to disable interrupts on your chosen platform then
-    //        this function will return false immediately. Note: during
-    //        Standby mode the processor is running from a 32 kHz clock
-    //        and so any interrupt that is triggered will run correspondingly
-    //        slower.
+    //        Note: any enabled external interrupt can wake the processor from
+    //        Standby mode, just as if the end of the period has expired.
     // \param powerDownBackupSram if true, backup SRAM will also be powered
     //        down in standby mode, otherwise it will be retained.
-    void enterStandby(uint32_t standbyPeriodMilliseconds, bool disableUserInterrupts = false, bool powerDownBackupSram = false);
+    void enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBackupSram = false);
 
+    /// Get the number of user interrupts that are enabled, sometimes helpful when debugging
+    // power-down modes.  User interrupts start at 0 and the number of them varies
+    // with the microcontroller.
+    // \param pList a pointer to an area in which the list of enabled user interrupts
+    //        will be stored.
+    // \param sizeOfList the size of the memory pointer to be pList, in bytes.
+    // \return the number of enabled user interrupts, -1 if it is not possible
+    //         to determine the number of enabled user interrupts.
+    int32_t numUserInterruptsEnabled(uint8_t *pList = NULL, uint32_t sizeOfList = 0);
+    
 protected:
 
-    /// Check whether an interrupt is enabled or not.  
-    // Note: available in CMSIS 5 but not earlier.  The version here is for
-    // an M4 core.
+     /// Check whether an interrupt is enabled or not.
     inline uint32_t myNVIC_GetEnableIRQ(IRQn_Type IRQn);
-    
-    // Disable the user interrupts.  The given number of user interrupts,
-    // counting from zero, will be disabled and, if pInterruptsActive is
-    // provided, it will be filled in with true for those user interrupts 
-    // that were active.
-    // \param pInterruptsActive pointer to an array of bools that will be
-    //        filled with true were an interrupt was active, othewise false.
-    //        If parameter is NULL, disabling of the given number of user
-    //        interrupts will still occur.  There must be space for at least
-    //        numInterruptsActive bools.
-    // \param numInterruptsActive the number of user interrupts to disable.
-    // \return the number of interrupts that were disabled.
-    uint32_t disableInterrupts(bool *pInterruptsActive, uint32_t numInterruptsActive);
 };
 
 #endif

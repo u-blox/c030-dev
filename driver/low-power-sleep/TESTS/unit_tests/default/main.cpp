@@ -3,7 +3,8 @@
 #include "unity.h"
 #include "utest.h"
 #include "low_power.h"
-#include <stm32f4xx_hal_tim.h>
+#include <stm32f4xx_hal_rcc.h>
+#include <stm32f4xx_hal_pwr.h>
  
 using namespace utest::v1;
 
@@ -17,7 +18,7 @@ using namespace utest::v1;
 #endif
 
 // The duration to sleep for during a test
-#define SLEEP_DURATION_SECONDS 2
+#define SLEEP_DURATION_SECONDS 3
 
 // Ticker period, should be set such that it will occur
 // within SLEEP_DURATION_SECONDS
@@ -100,7 +101,7 @@ void test_stop_mode() {
     startTicker();
     gpLowPower->enterStop(SLEEP_DURATION_SECONDS * 1000);
     TEST_ASSERT_FALSE(tickerExpired());
-    TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
+    TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS - 1); // -1 for tolerance
     stopTicker();
     
     // Do it again
@@ -108,13 +109,8 @@ void test_stop_mode() {
     startTicker();
     gpLowPower->enterStop(SLEEP_DURATION_SECONDS * 1000);
     TEST_ASSERT_FALSE(tickerExpired());
-    TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS);
+    TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS - 1); // -1 for tolerance
     stopTicker();
-    
-    // Let the UART recover after sleep or mbedgt can
-    // be confused by partial prints
-    wait_ms(100);
-    printf("Printing something to flush UART of rubbish.\n");
 }
 
 // Test the number of user interrupts that have been enabled
@@ -128,12 +124,8 @@ void test_interrupts_enabled() {
     // Check that we can just get the number back without any parameters
     userInterruptsEnabled = gpLowPower->numUserInterruptsEnabled();
     
-#if defined (NVIC_NUM_VECTORS) && defined (NVIC_USER_IRQ_OFFSET)
-# ifdef TARGET_STM
+#ifdef TARGET_STM
     TEST_ASSERT_EQUAL_INT32(2, userInterruptsEnabled);
-# endif
-#else
-    TEST_ASSERT_EQUAL_INT32(-1, userInterruptsEnabled);
 #endif
 
     // Now ask for a list, but only with one entry
@@ -175,14 +167,16 @@ void test_standby_mode() {
     for (uint32_t x = 0; x < sizeof (gBackupSram); x++) {
         TEST_ASSERT_EQUAL_INT8(0x42, gBackupSram[x]);
     }
+    
+    // Now store the current time in the first four bytes
+    *((time_t *) &(gBackupSram[0])) = time(NULL);
 
     startTicker();
     gpLowPower->enterStandby(SLEEP_DURATION_SECONDS * 1000);
 
-    // The result of this is that the processor will reset and we will
-    // come back again at main().  There we can check if (a) the
-    // right amount of time has expired and (b) Backup SRAM is still as we
-    // left it
+    // At the end of Standby mode the processor will reset and we will
+    // come back again at main().  There we can check if (a) Backup SRAM
+    // is still as we left it and (b) the right amount of time has expired
 
     // We should never get here
     TEST_ASSERT(false);
@@ -205,9 +199,14 @@ Case cases[] = {
     // This must be run second as test_stop_mode is expected to enable some interupts
     Case("Num user interrupts enabled", test_interrupts_enabled),
 #ifdef TARGET_STM
+ // Standby mode doesn't work while debugging, it's just the way the HW is
+# ifdef DEBUG
+# error If you want to run the test suite in debug mode, comment out this line.
+# else
     // Standby mode is only implemented for ST micro cores
     // This must be the last test as it resets us back to main()
     Case("Standby mode", test_standby_mode)
+# endif
 #endif
 };
 
@@ -217,25 +216,42 @@ Specification specification(test_setup, cases);
 // MAIN
 // ----------------------------------------------------------------
 
-int main() {    
+int main() {
     bool success = true;
     
+#ifndef DEBUG
+    gpLowPower->exitDebugMode();
+#endif
+
     // If the RTC is running then we must have been
     // in the Standby mode test and have just come back
     // from reset, so check that Backup SRAM has the
     // expected contents
     if (time(NULL) != (time_t) -1) {
-        for (uint32_t x = 0; (x < sizeof (gBackupSram)) && success; x++) {
+        // Check that we are at least SLEEP_DURATION_SECONDS past the time
+        // we entered Standby mode, which is stored at the start of gBackSream
+        printf ("Time: %d, recorded time %d.\n", time(NULL), *((time_t *) &(gBackupSram[0])));
+        if (time(NULL) - *((time_t *) &(gBackupSram[0])) < SLEEP_DURATION_SECONDS - 1) { // -1 for tolerance
+            success = false;
+        }
+
+        // The rest should be the fill value
+        for (uint32_t x = sizeof (time_t); (x < (sizeof (gBackupSram) - sizeof (time_t))) && success; x++) {
             if (gBackupSram[x] != 0x42) {
                 success = false;
             }
         }
-        
+
         TEST_ASSERT(success);
 
-        // Now we fake the end of the suite of tests
+        // Now we implement the end of the suite of tests manually
         printf ("{{__testcase_finish;Standby mode;%01d;%01d}}\n", success, !success);
         printf ("{{__testcase_summary;3;%01d}}\n", !success);
+        if (success) {
+            printf("{{end;success}}\n");
+        } else {
+            printf("{{end;failure}}\n");
+        }
         printf ("{{__exit;%01d}}\n", !success);
     } else {
         success = !Harness::run(specification);

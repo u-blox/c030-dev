@@ -167,14 +167,12 @@ void LowPower::enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBa
 /// Get the number of user interrupts that are enabled.
 int32_t LowPower::numUserInterruptsEnabled(uint8_t *pList, uint32_t sizeOfList)
 {
-    int32_t userInterruptsEnabled = -1;
+    int32_t userInterruptsEnabled = 0;
     uint8_t *pEndOfList = pList + sizeOfList;
     
-#if defined (NVIC_NUM_VECTORS) && defined (NVIC_USER_IRQ_OFFSET)
-# ifdef DEBUG_LOW_POWER
+#ifdef DEBUG_LOW_POWER
     printf ("Checking enabled interrupts...");
-# endif
-    userInterruptsEnabled = 0;
+#endif
     for (uint8_t x = 0; x < NVIC_NUM_VECTORS - NVIC_USER_IRQ_OFFSET; x++) {
         if (myNVIC_GetEnableIRQ((IRQn_Type) x)) {
             userInterruptsEnabled++;
@@ -182,23 +180,37 @@ int32_t LowPower::numUserInterruptsEnabled(uint8_t *pList, uint32_t sizeOfList)
                 *pList = x;
                 pList++;
             }
-# ifdef DEBUG_LOW_POWER
+#ifdef DEBUG_LOW_POWER
             printf (" %d", x);
-# endif
+#endif
         }
     }
 
-# ifdef DEBUG_LOW_POWER
+#ifdef DEBUG_LOW_POWER
     if (userInterruptsEnabled == 0) {
         printf (" (none were enabled)");
     }
     printf (".\n");
-# endif
-#else
-    printf ("Can't determine the number of user interrupts enabled.\n");
 #endif
     
     return userInterruptsEnabled;
+}
+
+/// Exit debug mode.
+void LowPower::exitDebugMode(void)
+{
+#ifdef TARGET_STM
+    // If this is a Power On Reset, do a system
+    // reset to get us out of our debug-mode 
+    // entanglement with the debug chip on the
+    // mbed board
+    if (!__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)) {
+        __HAL_RCC_CLEAR_RESET_FLAGS();
+        NVIC_SystemReset();
+    }
+#else
+#error Exit from debug mode only implemented for STM cores
+#endif    
 }
 
 // End Of File

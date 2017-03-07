@@ -18,33 +18,31 @@ Change directory to this repo and run:
 
 `mbed update`
 
-...to get the very latest mbed.
+...to get the very latest mbed-os development branch that has been forked to our u-blox github repository.
 
-Set the target and the toolchain that you want to use.  At the moment we are using the C027 target (as that pretty much works with the Vodafone UTM board). So the target and toolchain we'll use with this application is `UBLOX_C027` and we will chose the toolchain `ARM`, though note that `GCC_ARM` and `IAR` toolchains are also supported.  To get a list of supported targets and their toolchains enter `mbed compile -S`.
+Change to the `mbed-os` directory and run:
+
+`mbed update c030-dev`
+
+Set the target and the toolchain that you want to use, which should be `UBLOX_C030` and `GCC_ARM`.
 
 You can set the target and toolchain for this application once by entering the following two commands (while in the top-level directory of the cloned repo):
 
-`mbed target UBLOX_C027`
+`mbed target UBLOX_C030`
 
-`mbed toolchain ARM`
-
-Then, *BEFORE* you can begin using the C027 target on the Vodafone UTM board, you will need to hack the contents of one file:
-
-`mbed-os\targets\TARGET_NXP\TARGET_LPC176X\TARGET_UBLOX_C027\C027_api.c`
-
-Edit this file to remove the contents of *all* of the functions, so that they are simply stubs.
+`mbed toolchain GCC_ARM`
 
 Now you are ready to run the tests.  Connect your board to your PC and check that it can be found by entering:
 
 `mbedls`
 
-You should get back something like (this is for a C027 or UTM board):
+You should get back something like (this is for a C030 board):
 
 ```
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
 | platform_name | platform_name_unique | mount_point | serial_port | target_id                | daplink_version |
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
-| UBLOX_C027    | UBLOX_C027[0]        | D:          | COM1        | 12340201E3953CC69934E380 | 0201            |
+| UBLOX_C030    | UBLOX_C030[0]        | D:          | COM1        | 12340201E3953CC69934E380 | 0201            |
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
 ```
 
@@ -55,7 +53,7 @@ Now you can build and run the tests for this project on that board with the foll
 You should see output something like:
 
 ```
-Building library mbed-build (UBLOX_C027, ARM)
+Building library mbed-build (UBLOX_C030, GCC_ARM)
 Scan: c030
 Scan: FEATURE_BLE
 Scan: FEATURE_COMMON_PAL
@@ -71,10 +69,10 @@ Scan: FEATURE_THREAD_BORDER_ROUTER
 Scan: FEATURE_THREAD_END_DEVICE
 Scan: FEATURE_THREAD_ROUTER
 Scan: FEATURE_STORAGE
-Scan: ARM
+Scan: GCC_ARM
 Scan: FEATURE_LWIP
-Building project default (UBLOX_C027, ARM)
-Scan: ARM
+Building project default (UBLOX_C030, GCC_ARM)
+Scan: GCC_ARM
 Scan: FEATURE_LWIP
 Scan: default
 Compile [100.0%]: main.cpp
@@ -92,28 +90,28 @@ Allocated Stack: unknown
 Total Static RAM memory (data + bss): 10272 bytes
 Total RAM memory (data + bss + heap + stack): 10272 bytes
 Total Flash memory (text + data + misc): 37025 bytes
-Image: BUILD/tests/UBLOX_C027/ARM/driver/battery-gauge-bq27441/TESTS/unit_tests/default/default.bin
+Image: BUILD/tests/UBLOX_C030/GCC_ARM/driver/battery-gauge-bq27441/TESTS/unit_tests/default/default.bin
 
 
 Memory map breakdown for built projects (values in Bytes):
 +---------+------------+-----------+------------+-------+------+-----------+-------------+
 | name    | target     | toolchain | static_ram | stack | heap | total_ram | total_flash |
 +---------+------------+-----------+------------+-------+------+-----------+-------------+
-| default | UBLOX_C027 | ARM       |      10272 |     0 |    0 |     10272 |       37025 |
+| default | UBLOX_C030 | GCC_ARM   |      10272 |     0 |    0 |     10272 |       37025 |
 +---------+------------+-----------+------------+-------+------+-----------+-------------+
 
 Build successes:
-  * UBLOX_C027::ARM::DRIVER-BATTERY-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
-  * UBLOX_C027::ARM::MBED-BUILD
+  * UBLOX_C030::GCC_ARM::DRIVER-BATTERY-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
+  * UBLOX_C030::GCC_ARM::MBED-BUILD
 mbedgt: greentea test automation tool ver. 1.2.2
-mbedgt: test specification file 'C:\projects\c030\BUILD\tests\UBLOX_C027\ARM\test_spec.json' (specified with --test-spec option)
-mbedgt: using 'C:\projects\c030\BUILD\tests\UBLOX_C027\ARM\test_spec.json' from current directory!
+mbedgt: test specification file 'C:\projects\c030\BUILD\tests\UBLOX_C020\GCC_ARM\test_spec.json' (specified with --test-spec option)
+mbedgt: using 'C:\projects\c030\BUILD\tests\UBLOX_C030\GCC_ARM\test_spec.json' from current directory!
 mbedgt: detecting connected mbed-enabled devices...
 mbedgt: detected 1 device
-mbedgt: processing target 'UBLOX_C027' toolchain 'ARM' compatible platforms... (note: switch set to --parallel 1)
+mbedgt: processing target 'UBLOX_C030' toolchain 'GCC_ARM' compatible platforms... (note: switch set to --parallel 1)
 mbedgt: test case filter (specified with -n option)
         test filtered in 'driver-battery-gauge-bq27441-tests-unit_tests-default'
-mbedgt: running 1 test for platform 'UBLOX_C027' and toolchain 'ARM'
+mbedgt: running 1 test for platform 'UBLOX_C030' and toolchain 'GCC_ARM'
 mbedgt: mbed-host-test-runner: started
 mbedgt: checking for GCOV data...
 mbedgt: test on hardware with target id: 12340201E3953CC69934E380
@@ -123,18 +121,18 @@ mbedgt: test case summary: 1 pass, 0 failures
 mbedgt: all tests finished!
 mbedgt: shuffle seed: 0.7592919699
 mbedgt: test suite report:
-+----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
-| target         | platform_name | test suite                                            | result | elapsed_time (sec) | copy_method |
-+----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
-| UBLOX_C027-ARM | UBLOX_C027    | driver-battery-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
-+----------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
++--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
+| target             | platform_name | test suite                                            | result | elapsed_time (sec) | copy_method |
++--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
+| UBLOX_C030-GCC_ARM | UBLOX_C030    | driver-battery-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
++--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
 mbedgt: test suite results: 1 OK
 mbedgt: test case report:
-+----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-| target         | platform_name | test suite                                            | test case              | passed | failed | result | elapsed_time (sec) |
-+----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-| UBLOX_C027-ARM | UBLOX_C027    | driver-battery-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
-+----------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
++---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+| target              | platform_name | test suite                                            | test case              | passed | failed | result | elapsed_time (sec) |
++---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+|  UBLOX_C030-GCC_ARM | UBLOX_C030    | driver-battery-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
++---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
 ```
 
 # What To Do If You Are Not Interested In Tests
@@ -143,9 +141,13 @@ As well as the tests for the code in here, there is a `main.cpp` file which is u
 
 `mbed compile`
 
-You will find the output files in the sub-directory `BUILD/UBLOX_C027/ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the Vodafone UTM board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the Vodafone UTM board.  Press the `RESET_FB` button on the board and you should see serial output. It doesn't do a great deal, that's what the tests are for.
+You will find the output files in the sub-directory `BUILD/UBLOX_C030/GCC_ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the C030 board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the C030 board.  Press the reset button on the board and you should see serial output. It doesn't do a great deal, that's what the tests are for.
 
-# Other Things
+# Debugging
+
+In order to run a debugger on the target, which is best done under Eclipse, you should follow the instructions [here](http://erika.tuxfamily.org/wiki/index.php?title=Tutorial:_STM32_-_Integrated_Debugging_in_Eclipse_using_GNU_toolchain).
+
+This will involve installing [Eclipse (Mars)](https://eclipse.org/mars/) plus the GDB hardware plugin, the [ST-Link utility](http://www.st.com/en/embedded-software/stsw-link004.html), and a GDB server (the page suggests [Texane](https://github.com/texane/stlink).  There are Eclipse projects files in this repo, import them into Eclipse; configure the Eclipse debug launch options as the above web page directs, launch the ST-Link utility, launch the Texane GDB server, compile the target with debug information included (see below) and you should be able to see what's going on with source level debug.
 
 By default mbed builds with maximum optimisation and no debug information, i.e. a release build.  To build in such a way that source level single stepping is available, do a clean build with the following switch added to your compilation command line:
 

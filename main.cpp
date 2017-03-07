@@ -26,21 +26,17 @@
  */
 
 // Pin-out
-#define PIN_I2C_SDA  P0_27
-#define PIN_I2C_SCL  P0_28
+#define PIN_I2C_SDA  PB_7
+#define PIN_I2C_SCL  PB_6
  
 /// RSense (in mOhm) on UTM board for LTC2943 battery gauge
 #define LTC2943_RSENSE_MOHM 68
 
-// Required for UTM board
-#ifdef TARGET_UBLOX_C027
-static DigitalOut i2CPullUpBar(P1_1, 0);
-#endif 
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
 
-#if 0
+#if 1
 int main()
 {
     LowPower *pLowPower = new LowPower();

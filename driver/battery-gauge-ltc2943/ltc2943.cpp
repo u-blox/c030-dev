@@ -647,7 +647,7 @@ bool BatteryGaugeLtc2943::setTemperatureHigh (int32_t temperatureC)
         registerValue >>= 8;
         // Check for overflow in conversion to the register value
         printf ("registerValue %d, temperatureC %d, registerToTemperatureC(registerValue << 8) %d\n",
-                registerValue, temperatureC, registerToTemperatureC(registerValue << 8));
+                registerValue, (int) temperatureC, (int) registerToTemperatureC(registerValue << 8));
         if (TOLERANCE_CHECK (registerToTemperatureC(registerValue << 8), temperatureC, LTC_2943_TOLERANCE)) {
             data[0] = 0x16; // Temperature threshold high address
             // Only write the value if it fits (and taking into

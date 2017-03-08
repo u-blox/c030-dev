@@ -115,10 +115,9 @@ void test_charger_fault() {
     bitmap = pBatteryCharger->getChargerFaults();
     printf ("Charger fault is 0x%02x.\n", bitmap);
     // Should be just the watchdog as we are in host mode and are not servicing the watchdog
-    // however the chip seems to return battery over-voltage sometimes when it is fully charged
-    // so allow this through also
+    // however other faults can also be present so just look for a non zero value.
     // TODO: find a way to test other faults
-    TEST_ASSERT((bitmap & ~(BatteryChargerBq24295::CHARGER_FAULT_WATCHDOG_EXPIRED | BatteryChargerBq24295::CHARGER_FAULT_BATTERY_OVER_VOLTAGE)) == 0);
+    TEST_ASSERT((unsigned char) bitmap > 0);
 }
 
 // Test that we can read and change the input voltage and current limits

@@ -35,12 +35,12 @@ using namespace utest::v1;
 
 #ifndef PIN_I2C_SDA
 // Default for C030 board
-#define PIN_I2C_SDA PB_7
+#define PIN_I2C_SDA PC_9
 #endif
 
 #ifndef PIN_I2C_SDC
 // Default for C030 board
-#define PIN_I2C_SDC PB_6
+#define PIN_I2C_SDC PA_8
 #endif
 
 // ----------------------------------------------------------------

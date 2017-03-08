@@ -70,13 +70,13 @@ using namespace utest::v1;
 #endif
 
 #ifndef PIN_I2C_SDA
-// Default for C030 board
-#define PIN_I2C_SDA PB_7
+// Default for UTM board
+#define PIN_I2C_SDA P0_27
 #endif
 
 #ifndef PIN_I2C_SDC
-// Default for C030 board
-#define PIN_I2C_SDC PB_6
+// Default for UTM board
+#define PIN_I2C_SDC P0_28
 #endif
 
 // ----------------------------------------------------------------

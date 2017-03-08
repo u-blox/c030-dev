@@ -46,6 +46,10 @@ You should get back something like (this is for a C030 board):
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
 ```
 
+If you get back the platform ST_PLACEHOLDER (target_id commencing 0799) then you will need to get mbed to pretend it is a C030 board.  You can do this with the following command:
+
+`mbedls --mock 0799:UBLOX_C030`
+
 Now you can build and run the tests for this project on that board with the following command line:
 
 `mbed test -n driver*`
@@ -147,7 +151,20 @@ You will find the output files in the sub-directory `BUILD/UBLOX_C030/GCC_ARM/`.
 
 In order to run a debugger on the target, which is best done under Eclipse, you should follow the instructions [here](http://erika.tuxfamily.org/wiki/index.php?title=Tutorial:_STM32_-_Integrated_Debugging_in_Eclipse_using_GNU_toolchain).
 
-This will involve installing [Eclipse (Mars)](https://eclipse.org/mars/) plus the GDB hardware plugin, the [ST-Link utility](http://www.st.com/en/embedded-software/stsw-link004.html), and a GDB server (the page suggests [Texane](https://github.com/texane/stlink).  There are Eclipse projects files in this repo, import them into Eclipse; configure the Eclipse debug launch options as the above web page directs, launch the ST-Link utility, launch the Texane GDB server, compile the target with debug information included (see below) and you should be able to see what's going on with source level debug.
+This will involve installing [Eclipse (Mars)](https://eclipse.org/mars/) plus the GDB hardware plugin, the [ST-Link utility](http://www.st.com/en/embedded-software/stsw-link004.html), and a GDB server (the page suggests [Texane](https://github.com/texane/stlink).  There are Eclipse projects files in this repo, import them into Eclipse; configure the Eclipse debug launch options as the above web page directs, launch the Texane GDB server (the website says to launch the ST-Link utility also but that doesn't appear to be necessary, the Texane GDB server does everything), compile the target with debug information included (see below) and you should be able to see what's going on with source level debug.
+
+Note: I find that the Texane GDB server crashes when you close a debug session.   If, when starting a debug session, Eclipse reports the somewhat strange error:
+
+```
+Error in final launch sequence
+Failed to execute MI command:
+-target-select remote localhost:4242
+
+Error message from debugger back end:
+localhost:4242: The system tried to join a drive to a directory on a joined drive.
+```
+
+...then it probably means the Texane GDB server is not running.
 
 By default mbed builds with maximum optimisation and no debug information, i.e. a release build.  To build in such a way that source level single stepping is available, do a clean build with the following switch added to your compilation command line:
 

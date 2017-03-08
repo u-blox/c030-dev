@@ -18,13 +18,15 @@ Change directory to this repo and run:
 
 `mbed update`
 
-...to get the very latest mbed-os development branch that has been forked to our u-blox github repository.
+...to get the very latest mbed-os development branch that has been forked to u-blox Github.
 
 Change to the `mbed-os` directory and run:
 
 `mbed update c030-dev`
 
-Set the target and the toolchain that you want to use, which should be `UBLOX_C030` and `GCC_ARM`.
+...to switch to the `c030-dev` branch that we are working on in our u-blox mbed-os Github repository.
+
+Set the target and the toolchain that you want to use, which should be `UBLOX_C030` and one of `GCC_ARM`, `ARM` or `IAR`.
 
 You can set the target and toolchain for this application once by entering the following two commands (while in the top-level directory of the cloned repo):
 
@@ -46,11 +48,15 @@ You should get back something like (this is for a C030 board):
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
 ```
 
-If you get back the platform ST_PLACEHOLDER (target_id commencing 0799) then you will need to get mbed to pretend it is a C030 board.  You can do this with the following command:
+If you get back the platform NZ32_SC151 (target_id commencing 6660) then you will need to get mbed to pretend it is a C030 board.  You can do this with the following command:
 
-`mbedls --mock 0799:UBLOX_C030`
+`mbedls --mock 6660:UBLOX_C030`
 
-Now you can build and run the tests for this project on that board with the following command line:
+Now you can build and run the tests for all of mbed with the following command line:
+
+`mbed test`
+
+Or if you want to test just the drivers in the directory, use the following command line:
 
 `mbed test -n driver*`
 

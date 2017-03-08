@@ -17,7 +17,6 @@
 #include "mbed.h"
 #include "battery_charger_bq24295.h"
 #include "battery_gauge_bq27441.h"
-#include "battery_gauge_ltc2943.h"
 #include "low_power.h"
 
 /**
@@ -26,30 +25,41 @@
  */
 
 // Pin-out
-#define PIN_I2C_SDA  PB_7
-#define PIN_I2C_SCL  PB_6
- 
-/// RSense (in mOhm) on UTM board for LTC2943 battery gauge
-#define LTC2943_RSENSE_MOHM 68
+#define PIN_I2C_SDA  PC_9
+#define PIN_I2C_SCL  PA_8
+
+BACKUP_SRAM
+static char gBackupSram[BACKUP_SRAM_SIZE];
+
+#define BACKUP_SRAM_STRING "Back from the dead!\n"
 
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
 
-#if 1
+#if 0
 int main()
 {
     LowPower *pLowPower = new LowPower();
     BatteryChargerBq24295 *pBatteryCharger = NULL;
     BatteryGaugeBq27441 *pBatteryGaugeBq27441 = NULL;
-    BatteryGaugeLtc2943 *pBatteryGaugeLtc2943 = NULL;
     I2C *pI2C = NULL;
     bool chargerSuccess = false;
     bool gaugeBq27441Success = false;
-    bool gaugeLtc2943Success = false;
     
+    // Have to exit Debug mode on the chip if we want to go into Standby mode
+    pLowPower->exitDebugMode();
+
     printf("Starting up...\n");
     
+    printf("Checking if we've just come back from Standby mode...\n");
+    if (time(NULL) != 0) {
+        // If the RTC is running, we must have been awake previously
+        printf ("%*s", sizeof(BACKUP_SRAM_STRING), gBackupSram);
+    } else {
+        printf ("No, this is a cold start.\n");
+    }
+
     pI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SCL);
     
     if (pI2C != NULL) {
@@ -74,34 +84,30 @@ int main()
             printf("Unable to instantiate BQ27441 battery gauge chip.\n");
         }
         
-        pBatteryGaugeLtc2943 = new BatteryGaugeLtc2943();
-        if (pBatteryGaugeLtc2943 != NULL) {
-            gaugeLtc2943Success = pBatteryGaugeLtc2943->init(pI2C, LTC2943_RSENSE_MOHM);
-            if (!gaugeLtc2943Success) {
-                printf ("Unable to initialise LTC2943 battery gauge chip.\n");
-            }
-        } else {
-            printf("Unable to instantiate LTC2943 battery gauge chip.\n");
-        }
-        
     } else {
        printf("Unable to instantiate I2C.\n");
     }
 
-    if (chargerSuccess && gaugeBq27441Success && gaugeLtc2943Success) {
-        printf ("BQ24295 battery charger, BQ27441 battery gauge and LTC2943 battery gauge ready.\n");
-        
-        // Set the time to start the RTC
-        set_time(0);
-        
-        while (1) {
-            printf ("Entering Stop mode for 5 seconds...");
-            // Let the printf leave the building
-            wait_ms(100);
-            pLowPower->enterStop(5);
-            printf (" awake now.\n");
-        }
+    if (chargerSuccess && gaugeBq27441Success) {
+        printf ("BQ24295 battery charger and BQ27441 battery gauge ready.\n");
     }
+
+    printf ("Entering Stop mode for 5 seconds...");
+    // Let the printf leave the building
+    wait_ms(100);
+    pLowPower->enterStop(5000);
+    printf (" awake now.\n");
+
+    printf ("Putting \"Back from the dead!\" into BKPSRAM...");
+    memcpy (gBackupSram, BACKUP_SRAM_STRING, sizeof(BACKUP_SRAM_STRING));
+
+    printf ("Entering Standby mode for 5 seconds...");
+    // Let the printf leave the building
+    wait_ms(100);
+    pLowPower->enterStandby(5000);
+
+    printf("Should never get here.\n");
+    MBED_ASSERT(false);
     
     return 0;
 }

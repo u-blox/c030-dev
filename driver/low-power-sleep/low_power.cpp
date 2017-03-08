@@ -37,11 +37,8 @@
 // COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
-/// Location of backup SRAM in memory.
+/// Location of backup SRAM in memory (on STM23F4, has no effect otherwise).
 #define BACKUP_SRAM_START_ADDRESS ((uint32_t *) ((uint32_t) BKPSRAM_BASE))
-
-/// Size of backup SRAM.
-#define BACKUP_SRAM_SIZE 4096
 
 // ----------------------------------------------------------------
 // PRIVATE VARIABLES
@@ -159,7 +156,7 @@ void LowPower::enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBa
         // Now enter Standby mode
         HAL_PWR_EnterSTANDBYMode();
 #else
-# error This function is currently only implemented for STM microcontrollers.
+        MBED_ASSERT(false);
 #endif
     }
 }
@@ -209,7 +206,7 @@ void LowPower::exitDebugMode(void)
         NVIC_SystemReset();
     }
 #else
-#error Exit from debug mode only implemented for STM cores
+        MBED_ASSERT(false);
 #endif    
 }
 

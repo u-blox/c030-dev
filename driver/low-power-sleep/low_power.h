@@ -46,6 +46,13 @@
 // uint32_t importantThing = 3;
 #define BACKUP_SRAM __attribute__ ((section ("BKPSRAM")))
 
+/// Size of backup SRAM.
+#ifdef TARGET_STM
+#define BACKUP_SRAM_SIZE 4096
+#else
+#define BACKUP_SRAM_SIZE 0
+#endif
+
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------

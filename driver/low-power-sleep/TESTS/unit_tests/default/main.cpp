@@ -230,10 +230,15 @@ int main() {
     if (time(NULL) != (time_t) -1) {
         // Check that we are at least SLEEP_DURATION_SECONDS past the time
         // we entered Standby mode, which is stored at the start of gBackSream
-        printf ("Time: %d, recorded time %d.\n", time(NULL), *((time_t *) &(gBackupSram[0])));
+        // Note: GCC doesn't like my casting of a pointer but this is test
+        // code and there's no point in defining a union just for this
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+        printf ("Time: %d, recorded time %d.\n", (int) time(NULL), (int) *((time_t *) &(gBackupSram[0])));
         if (time(NULL) - *((time_t *) &(gBackupSram[0])) < SLEEP_DURATION_SECONDS - 1) { // -1 for tolerance
             success = false;
         }
+#pragma GCC diagnostic pop
 
         // The rest should be the fill value
         for (uint32_t x = sizeof (time_t); (x < (sizeof (gBackupSram) - sizeof (time_t))) && success; x++) {

@@ -98,10 +98,10 @@ int main()
     pLowPower->enterStop(5000);
     printf (" awake now.\n");
 
-    printf ("Putting \"Back from the dead!\" into BKPSRAM...");
+    printf ("Putting \"Back from the dead!\" into BKPSRAM...\n");
     memcpy (gBackupSram, BACKUP_SRAM_STRING, sizeof(BACKUP_SRAM_STRING));
 
-    printf ("Entering Standby mode for 5 seconds...");
+    printf ("Entering Standby mode for 5 seconds...\n");
     // Let the printf leave the building
     wait_ms(100);
     pLowPower->enterStandby(5000);

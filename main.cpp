@@ -22,42 +22,94 @@
 /**
  * @file main.cpp
  * main() for testing C030 stuff.
+ *
+ * IMPORTANT: this code puts the C030 MCU chip into
+ * its lowest power state.  The ability to do this
+ * is affected by the state of the debug chip on the board.
+ * To be sure that this code executes correctly, you must
+ * completely power off the board after downloading code,
+ * and power it back on again.
  */
 
 // Pin-out
 #define PIN_I2C_SDA  PC_9
 #define PIN_I2C_SCL  PA_8
 
+// Backup SRAM stuff
 BACKUP_SRAM
-static char gBackupSram[BACKUP_SRAM_SIZE];
+static time_t gTimeNow;
 
-#define BACKUP_SRAM_STRING "Back from the dead!\n"
+BACKUP_SRAM
+static char gBackupSram[BACKUP_SRAM_SIZE - sizeof (gTimeNow)];
+
+#define BACKUP_SRAM_STRING "Back from the dead!"
+
+// LEDs
+DigitalOut gLedRed(LED1);
+DigitalOut gLedGreen(LED2);
+DigitalOut gLedBlue(LED3);
+
+// ----------------------------------------------------------------
+// PRIVATE FUNCTIONS
+// ----------------------------------------------------------------
+
+static void signalGood(void)
+{
+    gLedGreen = 0;
+    gLedRed = 1;
+    gLedBlue = 1;
+    wait_ms(1000);
+    gLedGreen = 1;
+}
+
+static void signalBad(void)
+{
+    gLedRed = 0;
+    gLedGreen = 1;
+    gLedBlue = 1;
+    wait_ms(1000);
+    gLedRed = 1;
+}
+
+static void signalEvent(void)
+{
+    gLedBlue = 0;
+    gLedGreen = 1;
+    gLedRed = 1;
+    wait_ms(1000);
+    gLedBlue = 1;
+}
+
+static void signalOff(void)
+{
+    gLedGreen = 1;
+    gLedRed = 1;
+    gLedBlue = 1;
+}
 
 // ----------------------------------------------------------------
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
 
-#if 0
+#if 1
 int main()
 {
     LowPower *pLowPower = new LowPower();
     BatteryChargerBq24295 *pBatteryCharger = NULL;
-    BatteryGaugeBq27441 *pBatteryGaugeBq27441 = NULL;
+    BatteryGaugeBq27441 *pBatteryGauge = NULL;
     I2C *pI2C = NULL;
-    bool chargerSuccess = false;
-    bool gaugeBq27441Success = false;
+    time_t timeNow;
     
     // Have to exit Debug mode on the chip if we want to go into Standby mode
     pLowPower->exitDebugMode();
 
-    printf("Starting up...\n");
-    
-    printf("Checking if we've just come back from Standby mode...\n");
     if (time(NULL) != 0) {
         // If the RTC is running, we must have been awake previously
-        printf ("%*s", sizeof(BACKUP_SRAM_STRING), gBackupSram);
+        printf ("Awake from Standby mode after %d second(s).\n", time(NULL) - gTimeNow);
+        printf ("Backup RAM contains \"%.*s\".\n", sizeof(BACKUP_SRAM_STRING), gBackupSram);
     } else {
-        printf ("No, this is a cold start.\n");
+        printf("\n\nStarting up from a cold start.\n");
+        signalOff();
     }
 
     pI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SCL);
@@ -66,44 +118,53 @@ int main()
         
         pBatteryCharger = new BatteryChargerBq24295();
         if (pBatteryCharger != NULL) {
-            chargerSuccess = pBatteryCharger->init(pI2C);
-            if (!chargerSuccess) {
+            if (pBatteryCharger->init(pI2C)) {
+                printf ("BQ24295 battery charger ready.\n");
+                signalGood();
+            } else {
                 printf ("Unable to initialise BQ24295 charger chip.\n");
+                signalBad();
             }
         } else {
           printf("Unable to instantiate BQ24295 charger chip.\n");
+          signalBad();
         }          
       
-        pBatteryGaugeBq27441 = new BatteryGaugeBq27441();
-        if (pBatteryGaugeBq27441 != NULL) {
-            gaugeBq27441Success = pBatteryGaugeBq27441->init(pI2C);
-            if (!gaugeBq27441Success) {
+        pBatteryGauge = new BatteryGaugeBq27441();
+        if (pBatteryGauge != NULL) {
+            if (pBatteryGauge->init(pI2C)) {
+                printf ("BQ27441 battery gauge ready.\n");
+                signalGood();
+            } else {
                 printf ("Unable to initialise BQ27441 battery gauge chip.\n");
+                signalBad();
             }
         } else {
             printf("Unable to instantiate BQ27441 battery gauge chip.\n");
+            signalBad();
         }
         
     } else {
        printf("Unable to instantiate I2C.\n");
+       signalBad();
     }
 
-    if (chargerSuccess && gaugeBq27441Success) {
-        printf ("BQ24295 battery charger and BQ27441 battery gauge ready.\n");
-    }
-
-    printf ("Entering Stop mode for 5 seconds...");
+    printf ("Entering Stop mode for 5 seconds...\n");
     // Let the printf leave the building
     wait_ms(100);
+    signalEvent();
+    timeNow = time(NULL);
     pLowPower->enterStop(5000);
-    printf (" awake now.\n");
+    printf ("Awake from Stop mode after %d second(s).\n", time(NULL) - timeNow);
 
-    printf ("Putting \"Back from the dead!\" into BKPSRAM...\n");
+    printf ("Putting \"%s\" into BKPSRAM...\n", BACKUP_SRAM_STRING);
     memcpy (gBackupSram, BACKUP_SRAM_STRING, sizeof(BACKUP_SRAM_STRING));
 
     printf ("Entering Standby mode for 5 seconds...\n");
     // Let the printf leave the building
     wait_ms(100);
+    signalEvent();
+    gTimeNow = time(NULL);
     pLowPower->enterStandby(5000);
 
     printf("Should never get here.\n");

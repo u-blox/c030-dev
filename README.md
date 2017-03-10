@@ -147,7 +147,7 @@ mbedgt: test case report:
 
 # Low Power Modes
 
-The ability to enter and leave low power mdoes can be influenced by the debug chip on the mbed board.  It may not be possible to run test of low power mode using `mbed test` as usual as the process of downloading to the board causes the debug chip to put the target MCU into the wrong state.  A way around this is to download the build, power off the board entirely, power it up again and then run the tests without the download step, using:
+The ability to enter and leave low power modes can be influenced by the debug chip on the mbed board.  It may not be possible to run test of low power mode using `mbed test` as usual, as the process of downloading to the board causes the debug chip to put the target MCU into the wrong state.  A way around this is to download the build, power off the board entirely, power it up again and then run the tests without the download step, using:
 
 `mbedhtrun --skip-flashing -p COMx:9600`
 

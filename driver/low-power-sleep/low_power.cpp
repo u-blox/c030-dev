@@ -21,12 +21,13 @@
  */
 
 // Define this to print debug information
-#define DEBUG_LOW_POWER
+//#define DEBUG_LOW_POWER
 
 #include <mbed.h>
 #include <low_power.h>
 #ifdef TARGET_STM
 #include <stm32f4xx_hal_pwr.h>
+#include <stm32f4xx_hal_rcc.h>
 #endif
 
 #ifdef DEBUG_LOW_POWER
@@ -114,7 +115,7 @@ void LowPower::enterStop(uint32_t stopPeriodMilliseconds)
 #ifdef TARGET_STM
         HAL_PWREx_EnableFlashPowerDown();
 #endif        
-        deepsleep();
+        hal_deepsleep();
 #ifdef TARGET_STM
         HAL_PWREx_DisableFlashPowerDown();
 #endif
@@ -127,7 +128,7 @@ void LowPower::enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBa
     if (standbyPeriodMilliseconds > 0) {
         // If time is -1 the RTC is not running, so call set_time with
         // a value of zero to kick it into life
-        if (time(NULL) == (time_t) -1) {
+        if (time(NULL) <= 0) {
             set_time(0);
         }
         
@@ -153,7 +154,9 @@ void LowPower::enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBa
         // Set the RTC alarm
         WakeUp::set_ms(standbyPeriodMilliseconds);
 #ifdef TARGET_STM
-        // Now enter Standby mode
+        // Now enter Standby mode, clearing the wake-up flag first
+        // in case we've done this before
+        PWR->CR = PWR_CR_CWUF;
         HAL_PWR_EnterSTANDBYMode();
 #else
         MBED_ASSERT(false);
@@ -197,16 +200,16 @@ int32_t LowPower::numUserInterruptsEnabled(uint8_t *pList, uint32_t sizeOfList)
 void LowPower::exitDebugMode(void)
 {
 #ifdef TARGET_STM
-    // If this is a Power On Reset, do a system
+    // If this is a power on reset, do a system
     // reset to get us out of our debug-mode 
     // entanglement with the debug chip on the
     // mbed board
-    if (!__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)) {
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)) {
         __HAL_RCC_CLEAR_RESET_FLAGS();
         NVIC_SystemReset();
     }
 #else
-        MBED_ASSERT(false);
+    MBED_ASSERT(false);
 #endif    
 }
 

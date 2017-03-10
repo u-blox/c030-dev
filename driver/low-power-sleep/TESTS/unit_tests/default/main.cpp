@@ -3,8 +3,6 @@
 #include "unity.h"
 #include "utest.h"
 #include "low_power.h"
-#include <stm32f4xx_hal_rcc.h>
-#include <stm32f4xx_hal_pwr.h>
  
 using namespace utest::v1;
 
@@ -24,6 +22,9 @@ using namespace utest::v1;
 // within SLEEP_DURATION_SECONDS
 #define TICKER_PERIOD_US 1000000
 
+// The number of Standby mode iterations to run
+#define NUM_STANDBY_ITERATIONS 2
+
 // ----------------------------------------------------------------
 // PRIVATE VARIABLES
 // ----------------------------------------------------------------
@@ -37,9 +38,19 @@ static Ticker gTicker;
 // A count of ticks
 static uint32_t gTickCount = 0;
 
-// An item to take up all of Backup SRAM
+// The time stored in Backup SRAM
+// This has to be the first item in Backup SRAM as we check
+// its location below
 BACKUP_SRAM
-static char gBackupSram[4096];
+static time_t gStandbyTime;
+
+// The number of iterations of the Standby time test
+BACKUP_SRAM
+static uint32_t gNumStandby;
+
+// An item to take up the rest of Backup SRAM
+BACKUP_SRAM
+static char gBackupSram[4096 - sizeof (gStandbyTime) - sizeof (gNumStandby)];
 
 // ----------------------------------------------------------------
 // PRIVATE FUNCTIONS
@@ -99,6 +110,7 @@ void test_stop_mode() {
     // Test a short stop
     startTime = time(NULL);
     startTicker();
+
     gpLowPower->enterStop(SLEEP_DURATION_SECONDS * 1000);
     TEST_ASSERT_FALSE(tickerExpired());
     TEST_ASSERT(time(NULL) - startTime >= SLEEP_DURATION_SECONDS - 1); // -1 for tolerance
@@ -157,7 +169,7 @@ void test_interrupts_enabled() {
 void test_standby_mode() {
 #ifdef TARGET_STM
     // Check that the Backup SRAM array has been placed correctly
-    TEST_ASSERT_EQUAL_UINT32 (0x40024000, &(gBackupSram[0]));
+    TEST_ASSERT_EQUAL_UINT32 (0x40024000, &gStandbyTime);
 #endif
     
     // Fill backup SRAM with 0x42
@@ -168,10 +180,13 @@ void test_standby_mode() {
         TEST_ASSERT_EQUAL_INT8(0x42, gBackupSram[x]);
     }
     
-    // Now store the current time in the first four bytes
-    *((time_t *) &(gBackupSram[0])) = time(NULL);
-
     startTicker();
+    
+    // Store the current time and the number of iterations in Backup SRAM also
+    gNumStandby = 0;
+    gStandbyTime = time(NULL);
+
+    // Go into Standby mode
     gpLowPower->enterStandby(SLEEP_DURATION_SECONDS * 1000);
 
     // At the end of Standby mode the processor will reset and we will
@@ -196,10 +211,10 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 // Test cases
 Case cases[] = {
     Case("Stop mode", test_stop_mode),
-    // This must be run second as test_stop_mode is expected to enable some interupts
+    // This must be run second as test_stop_mode is expected to enable some interrupts
     Case("Num user interrupts enabled", test_interrupts_enabled),
 #ifdef TARGET_STM
- // Standby mode doesn't work while debugging, it's just the way the HW is
+    // Standby mode doesn't work while debugging, it's just the way the HW is
 # ifdef DEBUG
 # error If you want to run the test suite in debug mode, comment out this line.
 # else
@@ -226,22 +241,19 @@ int main() {
     // If the RTC is running then we must have been
     // in the Standby mode test and have just come back
     // from reset, so check that Backup SRAM has the
-    // expected contents
-    if (time(NULL) != (time_t) -1) {
+    // expected contents and that we've slept for the
+    // expected period
+    if (time(NULL) > 0) {
         // Check that we are at least SLEEP_DURATION_SECONDS past the time
-        // we entered Standby mode, which is stored at the start of gBackSream
-        // Note: GCC doesn't like my casting of a pointer but this is test
-        // code and there's no point in defining a union just for this
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-        printf ("Time: %d, recorded time %d.\n", (int) time(NULL), (int) *((time_t *) &(gBackupSram[0])));
-        if (time(NULL) - *((time_t *) &(gBackupSram[0])) < SLEEP_DURATION_SECONDS - 1) { // -1 for tolerance
+        // we entered Standby mode, which is stored in Backup SRAM
+        printf ("Time: %d, recorded time %d.\n", (int) time(NULL), (int) gStandbyTime);
+        if (time(NULL) - gStandbyTime < SLEEP_DURATION_SECONDS - 1) { // -1 for tolerance
             success = false;
+            TEST_ASSERT(false);
         }
-#pragma GCC diagnostic pop
 
         // The rest should be the fill value
-        for (uint32_t x = sizeof (time_t); (x < (sizeof (gBackupSram) - sizeof (time_t))) && success; x++) {
+        for (uint32_t x = 0; (x < sizeof (gBackupSram)) && success; x++) {
             if (gBackupSram[x] != 0x42) {
                 success = false;
             }
@@ -249,16 +261,26 @@ int main() {
 
         TEST_ASSERT(success);
 
-        // Now we implement the end of the suite of tests manually
-        printf ("{{__testcase_finish;Standby mode;%01d;%01d}}\n", success, !success);
-        printf ("{{__testcase_summary;3;%01d}}\n", !success);
-        if (success) {
-            printf("{{end;success}}\n");
+        gNumStandby++;
+        if (success && (gNumStandby < NUM_STANDBY_ITERATIONS)) {
+            // Go into Standby mode again
+            gStandbyTime = time(NULL);
+            gpLowPower->enterStandby(SLEEP_DURATION_SECONDS * 1000);
+            // Again, we will come back from reset so should never get here
+            TEST_ASSERT(false);
         } else {
-            printf("{{end;failure}}\n");
+            // Now we have to implement the end of the suite of tests manually
+            printf ("{{__testcase_finish;Standby mode;%01d;%01d}}\n", success, !success);
+            printf ("{{__testcase_summary;3;%01d}}\n", !success);
+            if (success) {
+                printf("{{end;success}}\n");
+            } else {
+                printf("{{end;failure}}\n");
+            }
+            printf ("{{__exit;%01d}}\n", !success);
         }
-        printf ("{{__exit;%01d}}\n", !success);
     } else {
+        // Otherwise, we can just run the test suite
         success = !Harness::run(specification);
     }
     

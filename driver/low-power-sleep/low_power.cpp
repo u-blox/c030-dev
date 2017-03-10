@@ -92,9 +92,9 @@ LowPower::~LowPower(void)
 void LowPower::enterStop(uint32_t stopPeriodMilliseconds)
 {
     if (stopPeriodMilliseconds > 0) {
-        // If time is -1 the RTC is not running, so call set_time with
+        // If the RTC is not running, call set_time with
         // a value of zero to kick it into life
-        if (time(NULL) == (time_t) -1) {
+        if (time(NULL) <= 0) {
             set_time(0);
         }
 
@@ -126,7 +126,7 @@ void LowPower::enterStop(uint32_t stopPeriodMilliseconds)
 void LowPower::enterStandby(uint32_t standbyPeriodMilliseconds, bool powerDownBackupSram)
 {
     if (standbyPeriodMilliseconds > 0) {
-        // If time is -1 the RTC is not running, so call set_time with
+        // If time the RTC is not running, call set_time with
         // a value of zero to kick it into life
         if (time(NULL) <= 0) {
             set_time(0);

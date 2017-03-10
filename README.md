@@ -145,6 +145,14 @@ mbedgt: test case report:
 +---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
 ```
 
+# Low Power Modes
+
+The ability to enter and leave low power mdoes can be influenced by the debug chip on the mbed board.  It may not be possible to run test of low power mode using `mbed test` as usual as the process of downloading to the board causes the debug chip to put the target MCU into the wrong state.  A way around this is to download the build, power off the board entirely, power it up again and then run the tests without the download step, using:
+
+`mbedhtrun --skip-flashing -p COMx:9600`
+
+...where `x` is replaced by the number of the COM port where the board is attached.
+
 # What To Do If You Are Not Interested In Tests
 
 As well as the tests for the code in here, there is a `main.cpp` file which is usually not used as it gets in the way of compilation of the tests.  If you wish to use it, edit it and change the `#if 0` to be `#if 1`.  Then you can compile it with:

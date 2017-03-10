@@ -209,6 +209,15 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 }
 
 // Test cases
+// NOTE: the ability to enter low power states can be influenced by the debug chip
+// on the mbed board.  It may not be possible to run these tests simply
+// with mbed test as usual as the process of downloading to the board causes the
+// debug chip to put the target MCU into the wrong state.  A way around this is
+// to download the build, power off the board entirely, power it up again and
+// then run the tests without the download step, using:
+//
+// mbedhtrun --skip-flashing -p COMx:9600
+// where x is replaced by the COM port where the board is attached.
 Case cases[] = {
     Case("Stop mode", test_stop_mode),
     // This must be run second as test_stop_mode is expected to enable some interrupts
@@ -263,6 +272,8 @@ int main() {
 
         gNumStandby++;
         if (success && (gNumStandby < NUM_STANDBY_ITERATIONS)) {
+            // Let printf leave the building
+            wait_ms(100);
             // Go into Standby mode again
             gStandbyTime = time(NULL);
             gpLowPower->enterStandby(SLEEP_DURATION_SECONDS * 1000);

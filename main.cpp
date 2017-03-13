@@ -105,10 +105,14 @@ int main()
 
     if (time(NULL) != 0) {
         // If the RTC is running, we must have been awake previously
-        printf ("Awake from Standby mode after %d second(s).\n", time(NULL) - gTimeNow);
+        printf ("Awake from Standby mode after %d second(s).\n", (int) (time(NULL) - gTimeNow));
         printf ("Backup RAM contains \"%.*s\".\n", sizeof(BACKUP_SRAM_STRING), gBackupSram);
     } else {
         printf("\n\nStarting up from a cold start.\n");
+        printf("IMPORTANT: this code puts the STM32F4xx chip into its lowest power state.\n");
+        printf("The ability to do this is affected by the state of the debug chip on the C030\n");
+        printf("board. To be sure that this code executes correctly, you must completely power\n");
+        printf("off the board after downloading code, and power it back on again.\n\n");
         signalOff();
     }
 
@@ -155,7 +159,7 @@ int main()
     signalEvent();
     timeNow = time(NULL);
     pLowPower->enterStop(5000);
-    printf ("Awake from Stop mode after %d second(s).\n", time(NULL) - timeNow);
+    printf ("Awake from Stop mode after %d second(s).\n", (int) (time(NULL) - timeNow));
 
     printf ("Putting \"%s\" into BKPSRAM...\n", BACKUP_SRAM_STRING);
     memcpy (gBackupSram, BACKUP_SRAM_STRING, sizeof(BACKUP_SRAM_STRING));

@@ -1,0 +1,1 @@
+This class provides an API to communicate with a u-blox GNSS chip.  The files here originate from https://developer.mbed.org/teams/ublox/code/C027_Support/ at revision 138:dafbbf31bf76.

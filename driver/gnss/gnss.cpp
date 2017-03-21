@@ -23,18 +23,39 @@
 #include "ctype.h"
 #include "gnss.h"
 
-#ifdef TARGET_UBLOX_C030
- #include "c030_api.h"
-#endif
-
-void GNSSParser::powerOff(void)
+GnssParser::GnssParser(void)
 {
-    // set the gnss into backup mode using the command RMX-LPREQ
+    // Create the power pins but set everything to disabled
+    _gnssPower = new DigitalInOut(GNSSPWR, PIN_OUTPUT, OpenDrain, 0);
+    _gnssEnable = new DigitalInOut(GNSSEN, PIN_OUTPUT, PushPullNoPull, 0);
+}
+
+GnssParser::~GnssParser(void)
+{
+    // Set the power pins to lowest power state before ending
+   *_gnssPower = 0;
+   *_gnssEnable = 0;
+   delete _gnssPower;
+   delete _gnssEnable;
+}
+
+void GnssParser::powerOff(void)
+{
+    // set the GNSS into backup mode using the command RMX-LPREQ
     struct { unsigned long dur; unsigned long flags; } msg = {0/*endless*/,0/*backup*/};
     sendUbx(0x02, 0x41, &msg, sizeof(msg));
 }
 
-int GNSSParser::_getMessage(Pipe<char>* pipe, char* buf, int len)
+void GnssParser::_powerOn(void)
+{
+    // Power up and enable the module
+    *_gnssPower = 1;
+    wait_ms (1);
+    *_gnssEnable = 1;
+    wait_ms (1);
+}
+
+int GnssParser::_getMessage(Pipe<char>* pipe, char* buf, int len)
 {
     int unkn = 0;
     int sz = pipe->size();
@@ -72,7 +93,7 @@ int GNSSParser::_getMessage(Pipe<char>* pipe, char* buf, int len)
     return WAIT;
 }
 
-int GNSSParser::_parseNmea(Pipe<char>* pipe, int len)
+int GnssParser::_parseNmea(Pipe<char>* pipe, int len)
 {
     int o = 0;
     int c = 0;
@@ -89,10 +110,10 @@ int GNSSParser::_parseNmea(Pipe<char>* pipe, int len)
         c ^= ch;
     }
     if (++o > len)                      return WAIT;
-    ch = toHex[(c >> 4) & 0xF]; // high nibble
+    ch = _toHex[(c >> 4) & 0xF]; // high nibble
     if (ch != pipe->next())             return NOT_FOUND;
     if (++o > len)                      return WAIT;
-    ch = toHex[(c >> 0) & 0xF]; // low nibble
+    ch = _toHex[(c >> 0) & 0xF]; // low nibble
     if (ch != pipe->next())             return NOT_FOUND;
     if (++o > len)                      return WAIT;
     if ('\r' != pipe->next())           return NOT_FOUND;
@@ -101,7 +122,7 @@ int GNSSParser::_parseNmea(Pipe<char>* pipe, int len)
     return o;
 }
 
-int GNSSParser::_parseUbx(Pipe<char>* pipe, int l)
+int GnssParser::_parseUbx(Pipe<char>* pipe, int l)
 {
     int o = 0;
     if (++o > l)                return WAIT;
@@ -131,12 +152,12 @@ int GNSSParser::_parseUbx(Pipe<char>* pipe, int l)
     return o;
 }
 
-int GNSSParser::send(const char* buf, int len)
+int GnssParser::send(const char* buf, int len)
 {
     return _send(buf, len);
 }
 
-int GNSSParser::sendNmea(const char* buf, int len)
+int GnssParser::sendNmea(const char* buf, int len)
 {
     char head[1] = { '$' };
     char tail[5] = { '*', 0x00/*crc_high*/, 0x00/*crc_low*/, '\r', '\n' };
@@ -146,13 +167,13 @@ int GNSSParser::sendNmea(const char* buf, int len)
         crc ^= *buf++;
     i  = _send(head, sizeof(head));
     i += _send(buf, len);
-    tail[1] = toHex[(crc > 4) & 0xF0];
-    tail[2] = toHex[(crc > 0) & 0x0F];
+    tail[1] = _toHex[(crc > 4) & 0xF0];
+    tail[2] = _toHex[(crc > 0) & 0x0F];
     i += _send(tail, sizeof(tail));
     return i;
 }
 
-int GNSSParser::sendUbx(unsigned char cls, unsigned char id, const void* buf /*= NULL*/, int len /*= 0*/)
+int GnssParser::sendUbx(unsigned char cls, unsigned char id, const void* buf /*= NULL*/, int len /*= 0*/)
 {
     char head[6] = { 0xB5, 0x62, cls, id, (char) len, (char) (len >> 8)};
     char crc[2];
@@ -177,7 +198,7 @@ int GNSSParser::sendUbx(unsigned char cls, unsigned char id, const void* buf /*=
     return i;
 }
 
-const char* GNSSParser::findNmeaItemPos(int ix, const char* start, const char* end)
+const char* GnssParser::findNmeaItemPos(int ix, const char* start, const char* end)
 {
     // find the start
     for (; (start < end) && (ix > 0); start ++)
@@ -193,7 +214,7 @@ const char* GNSSParser::findNmeaItemPos(int ix, const char* start, const char* e
         return NULL;
 }
 
-bool GNSSParser::getNmeaItem(int ix, char* buf, int len, double& val)
+bool GnssParser::getNmeaItem(int ix, char* buf, int len, double& val)
 {
     char* end = &buf[len];
     const char* pos = findNmeaItemPos(ix, buf, end);
@@ -205,7 +226,7 @@ bool GNSSParser::getNmeaItem(int ix, char* buf, int len, double& val)
     return (end > pos);
 }
 
-bool GNSSParser::getNmeaItem(int ix, char* buf, int len, int& val, int base /*=10*/)
+bool GnssParser::getNmeaItem(int ix, char* buf, int len, int& val, int base /*=10*/)
 {
     char* end = &buf[len];
     const char* pos = findNmeaItemPos(ix, buf, end);
@@ -216,7 +237,7 @@ bool GNSSParser::getNmeaItem(int ix, char* buf, int len, int& val, int base /*=1
     return (end > pos);
 }
 
-bool GNSSParser::getNmeaItem(int ix, char* buf, int len, char& val)
+bool GnssParser::getNmeaItem(int ix, char* buf, int len, char& val)
 {
     const char* end = &buf[len];
     const char* pos = findNmeaItemPos(ix, buf, end);
@@ -236,7 +257,7 @@ bool GNSSParser::getNmeaItem(int ix, char* buf, int len, char& val)
     return false;
 }
 
-bool GNSSParser::getNmeaAngle(int ix, char* buf, int len, double& val)
+bool GnssParser::getNmeaAngle(int ix, char* buf, int len, double& val)
 {
     char ch;
     if (getNmeaItem(ix,buf,len,val) && getNmeaItem(ix+1,buf,len,ch) && 
@@ -252,35 +273,29 @@ bool GNSSParser::getNmeaAngle(int ix, char* buf, int len, double& val)
     return false;
 }
                 
-const char GNSSParser::toHex[] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
+const char GnssParser::_toHex[] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
 
 // ----------------------------------------------------------------
 // Serial Implementation 
 // ----------------------------------------------------------------
 
-GNSSSerial::GNSSSerial(PinName tx /*= GNSSTXD  */, PinName rx /*= GNSSRXD */, int baudrate /*= GNSSBAUD */,
+GnssSerial::GnssSerial(PinName tx /*= GNSSTXD  */, PinName rx /*= GNSSRXD */, int baudrate /*= GNSSBAUD */,
             int rxSize /*= 256 */, int txSize /*= 128 */) :
             SerialPipe(tx, rx, baudrate, rxSize, txSize)
 {
     baud(baudrate);
-#ifdef TARGET_UBLOX_C030
-    _onboard = (tx == GNSSTXD) || (rx == GNSSRXD);
-    if (_onboard)
-        c030_gnss_powerOn();
-#endif
 }
 
-GNSSSerial::~GNSSSerial(void)
+GnssSerial::~GnssSerial(void)
 {
     powerOff();
-#ifdef TARGET_UBLOX_C030
-    if (_onboard)
-         c030_gnss_powerOff();
-#endif
 }
 
-bool GNSSSerial::init(PinName pn)
+bool GnssSerial::init(PinName pn)
 {
+    // Power up and enable the module
+    _powerOn();
+
     // send a byte to wakup the device again
     putc(0xFF);
     // wait until we get some bytes
@@ -292,12 +307,12 @@ bool GNSSSerial::init(PinName pn)
     return (size != _pipeRx.size());
 }
 
-int GNSSSerial::getMessage(char* buf, int len)
+int GnssSerial::getMessage(char* buf, int len)
 {
     return _getMessage(&_pipeRx, buf, len);   
 }
 
-int GNSSSerial::_send(const void* buf, int len)
+int GnssSerial::_send(const void* buf, int len)
 { 
     return put((const char*)buf, len, true/*=blocking*/); 
 }
@@ -306,31 +321,25 @@ int GNSSSerial::_send(const void* buf, int len)
 // I2C Implementation 
 // ----------------------------------------------------------------
 
-GNSSI2C::GNSSI2C(PinName sda /*= NC */, PinName scl /*= NC */,
+GnssI2C::GnssI2C(PinName sda /*= NC */, PinName scl /*= NC */,
                unsigned char i2cAdr /*= (66<<1) */, int rxSize /*= 256 */) :
                I2C(sda,scl),
                _pipe(rxSize),
                _i2cAdr(i2cAdr)
 {
     frequency(100000);
-#ifdef TARGET_UBLOX_C030
-    _onboard = (sda == PC_9) && (scl == PA_8);
-    if (_onboard)
-        c030_gnss_powerOn();
-#endif
 }
 
-GNSSI2C::~GNSSI2C(void)
+GnssI2C::~GnssI2C(void)
 {
     powerOff();
-#ifdef TARGET_UBLOX_C030
-    if (_onboard)
-         c030_gnss_powerOff();
-#endif
 }
 
-bool GNSSI2C::init(PinName pn)
+bool GnssI2C::init(PinName pn)
 {
+    // Power up and enable the module
+    _powerOn();
+
     if (pn != NC) {
         DigitalOut pin(pn, 0);
         ::wait_us(1);
@@ -340,7 +349,7 @@ bool GNSSI2C::init(PinName pn)
     return !I2C::write(_i2cAdr,&REGSTREAM,sizeof(REGSTREAM));
 }
 
-int GNSSI2C::getMessage(char* buf, int len)
+int GnssI2C::getMessage(char* buf, int len)
 {
     // fill the pipe
     int sz = _pipe.free();
@@ -352,7 +361,7 @@ int GNSSI2C::getMessage(char* buf, int len)
     return _getMessage(&_pipe, buf, len);   
 }
 
-int GNSSI2C::send(const char* buf, int len)
+int GnssI2C::send(const char* buf, int len)
 {
     int sent = 0;
     if (len) 
@@ -364,25 +373,25 @@ int GNSSI2C::send(const char* buf, int len)
     return sent;
 }
 
-int GNSSI2C::sendNmea(const char* buf, int len)
+int GnssI2C::sendNmea(const char* buf, int len)
 { 
     int sent = 0;
     if (!I2C::write(_i2cAdr,&REGSTREAM,sizeof(REGSTREAM),true))
-        sent = GNSSParser::sendNmea(buf, len);
+        sent = GnssParser::sendNmea(buf, len);
     stop();
     return sent;
 }
 
-int GNSSI2C::sendUbx(unsigned char cls, unsigned char id, const void* buf, int len)
+int GnssI2C::sendUbx(unsigned char cls, unsigned char id, const void* buf, int len)
 { 
     int sent = 0;
     if (!I2C::write(_i2cAdr,&REGSTREAM,sizeof(REGSTREAM),true))
-        sent = GNSSParser::sendUbx(cls, id, buf, len);
+        sent = GnssParser::sendUbx(cls, id, buf, len);
     I2C::stop();
     return sent;
 }
 
-int GNSSI2C::_get(char* buf, int len)
+int GnssI2C::_get(char* buf, int len)
 {
     int read = 0;
     unsigned char sz[2] = {0,0};
@@ -403,12 +412,12 @@ int GNSSI2C::_get(char* buf, int len)
     return read;
 }
 
-int GNSSI2C::_send(const void* buf, int len)
+int GnssI2C::_send(const void* buf, int len)
 { 
     return !I2C::write(_i2cAdr,(const char*)buf,len,true) ? len : 0; 
 }
 
-const char GNSSI2C::REGLEN    = 0xFD;
-const char GNSSI2C::REGSTREAM = 0xFF;
+const char GnssI2C::REGLEN    = 0xFD;
+const char GnssI2C::REGSTREAM = 0xFF;
 
 // End Of File

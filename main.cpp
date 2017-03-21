@@ -18,6 +18,7 @@
 #include "battery_charger_bq24295.h"
 #include "battery_gauge_bq27441.h"
 #include "low_power.h"
+#include "gnss.h"
 
 /**
  * @file main.cpp
@@ -34,6 +35,12 @@
 // Pin-out
 #define PIN_I2C_SDA  PC_9
 #define PIN_I2C_SCL  PA_8
+
+#define GNSS_WAIT_TIME_SECONDS 120
+#define STOP_TIME_SECONDS 5
+#define STANDBY_TIME_SECONDS 5
+
+#define _CHECK_TALKER(s) ((buffer[3] == s[0]) && (buffer[4] == s[1]) && (buffer[5] == s[2]))
 
 // Backup SRAM stuff
 BACKUP_SRAM
@@ -91,17 +98,25 @@ static void signalOff(void)
 // PUBLIC FUNCTIONS: MAIN
 // ----------------------------------------------------------------
 
-#if 1
+#if 0
 int main()
 {
+    GnssSerial *pGnss = new GnssSerial();
     LowPower *pLowPower = new LowPower();
     BatteryChargerBq24295 *pBatteryCharger = NULL;
     BatteryGaugeBq27441 *pBatteryGauge = NULL;
     I2C *pI2C = NULL;
     time_t timeNow;
-    
+    int gnssReturnCode;
+    char buffer[256];
+    bool gotTime = false;
+
+
     // Have to exit Debug mode on the chip if we want to go into Standby mode
     pLowPower->exitDebugMode();
+
+    // Power up GNSS
+    pGnss->init();
 
     if (time(NULL) != 0) {
         // If the RTC is running, we must have been awake previously
@@ -117,9 +132,9 @@ int main()
     }
 
     pI2C = new I2C(PIN_I2C_SDA, PIN_I2C_SCL);
-    
+
     if (pI2C != NULL) {
-        
+
         pBatteryCharger = new BatteryChargerBq24295();
         if (pBatteryCharger != NULL) {
             if (pBatteryCharger->init(pI2C)) {
@@ -132,8 +147,8 @@ int main()
         } else {
           printf("Unable to instantiate BQ24295 charger chip.\n");
           signalBad();
-        }          
-      
+        }
+
         pBatteryGauge = new BatteryGaugeBq27441();
         if (pBatteryGauge != NULL) {
             if (pBatteryGauge->init(pI2C)) {
@@ -147,33 +162,59 @@ int main()
             printf("Unable to instantiate BQ27441 battery gauge chip.\n");
             signalBad();
         }
-        
+
     } else {
        printf("Unable to instantiate I2C.\n");
        signalBad();
     }
 
-    printf ("Entering Stop mode for 5 seconds...\n");
-    // Let the printf leave the building
-    wait_ms(100);
-    signalEvent();
-    timeNow = time(NULL);
-    pLowPower->enterStop(5000);
-    printf ("Awake from Stop mode after %d second(s).\n", (int) (time(NULL) - timeNow));
+    printf ("Waiting up to %d second(s) for GNSS to receive the time...\n", GNSS_WAIT_TIME_SECONDS);
+    for (uint32_t x = 0; (x < GNSS_WAIT_TIME_SECONDS) && !gotTime; x+= STOP_TIME_SECONDS) {
+        while ((gnssReturnCode = pGnss->getMessage(buffer, sizeof(buffer))) > 0) {
+            int32_t length = LENGTH(gnssReturnCode);
 
-    printf ("Putting \"%s\" into BKPSRAM...\n", BACKUP_SRAM_STRING);
+            if ((PROTOCOL(gnssReturnCode) == GnssParser::NMEA) && (length > 6)) {
+                // talker is $GA=Galileo $GB=Beidou $GL=Glonass $GN=Combined $GP=GNSS
+                if ((buffer[0] == '$') || buffer[1] == 'G') {
+                    if (_CHECK_TALKER("GGA") || _CHECK_TALKER("GNS")) {
+                        const char *pTimeString = NULL;
+
+                        // Retrieve the time
+                        pTimeString = pGnss->findNmeaItemPos(1, buffer, buffer + length);
+                        if (pTimeString != NULL) {
+                            gotTime = true;
+                            printf("GNSS: time is %.6s.\n", pTimeString);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!gotTime) {
+            printf ("  Entering Stop mode for %d second(s) while waiting...\n", STOP_TIME_SECONDS);
+            // Let the printf leave the building
+            wait_ms(100);
+            signalEvent();
+            timeNow = time(NULL);
+            pLowPower->enterStop(STOP_TIME_SECONDS * 1000);
+            printf ("  Awake from Stop mode after %d second(s).\n", (int) (time(NULL) - timeNow));
+        }
+    }
+
+
+    printf ("\nPutting \"%s\" into BKPSRAM...\n", BACKUP_SRAM_STRING);
     memcpy (gBackupSram, BACKUP_SRAM_STRING, sizeof(BACKUP_SRAM_STRING));
 
-    printf ("Entering Standby mode for 5 seconds...\n");
+    printf ("Entering Standby mode for %d second(s)...\n", STANDBY_TIME_SECONDS);
     // Let the printf leave the building
     wait_ms(100);
     signalEvent();
     gTimeNow = time(NULL);
-    pLowPower->enterStandby(5000);
+    pLowPower->enterStandby(STANDBY_TIME_SECONDS * 1000);
 
     printf("Should never get here.\n");
     MBED_ASSERT(false);
-    
+
     return 0;
 }
 #endif

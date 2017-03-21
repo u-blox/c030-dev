@@ -13,8 +13,8 @@ using namespace utest::v1;
 // COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
-// How long to wait for a fix
-#define FIX_WAIT_SECONDS 120
+// How long to wait for a GNSS result
+#define GNSS_WAIT_SECONDS 120
 
 // ----------------------------------------------------------------
 // PRIVATE VARIABLES
@@ -59,7 +59,7 @@ void test_serial_ubx() {
     int responseLength = 0;
     int returnCode;
 
-    GNSSSerial *pGnss = new GNSSSerial();
+    GnssSerial *pGnss = new GnssSerial();
 
     // Initialise the GNSS chip and wait for it to start up
     pGnss->init(NC);
@@ -76,9 +76,9 @@ void test_serial_ubx() {
     while (responseLength == 0) {
         // Wait for the required Ack
         returnCode = pGnss->getMessage(buffer, sizeof(buffer));
-        if ((returnCode != GNSSSerial::WAIT) && (returnCode != GNSSSerial::NOT_FOUND)) {
+        if ((returnCode != GnssSerial::WAIT) && (returnCode != GnssSerial::NOT_FOUND)) {
             responseLength = LENGTH(returnCode);
-            if ((PROTOCOL(returnCode) == GNSSSerial::UBX)) {
+            if ((PROTOCOL(returnCode) == GnssSerial::UBX)) {
                 printHex(buffer, responseLength);
                 // Ack is  0xb5-62-05-00-02-00-msgclass-msgid-crcA-crcB
                 // Nack is 0xb5-62-05-01-02-00-msgclass-msgid-crcA-crcB
@@ -90,7 +90,7 @@ void test_serial_ubx() {
                 TEST_ASSERT_EQUAL_UINT8(0x00, buffer[5]);
                 TEST_ASSERT_EQUAL_UINT8(0x06, buffer[6]);
                 TEST_ASSERT_EQUAL_UINT8(0x24, buffer[7]);
-            } else if ((PROTOCOL(returnCode) == GNSSSerial::NMEA)) {
+            } else if ((PROTOCOL(returnCode) == GnssSerial::NMEA)) {
                 printf ("%.*s", responseLength, buffer);
                 responseLength = 0;
             } else {
@@ -102,9 +102,9 @@ void test_serial_ubx() {
     }
 }
 
-// Test getting a fix using the serial interface
-void test_serial_fix() {
-    GNSSSerial *pGnss = new GNSSSerial();
+// Test getting a response from GNSS using the serial interface
+void test_serial_time() {
+    GnssSerial *pGnss = new GnssSerial();
 
     bool gotLatLong = false;
     bool gotElevation = false;
@@ -117,18 +117,18 @@ void test_serial_fix() {
     double elevation;
     double speed;
 
-    printf("GNSS: powering up and waiting up to %d second(s) for a fix.\r\n", FIX_WAIT_SECONDS);
+    printf("GNSS: powering up and waiting up to %d second(s) for something to happen.\n", GNSS_WAIT_SECONDS);
     pGnss->init();
 
     memset(buffer, 0, sizeof(buffer));
-    for (uint32_t x = 0; (x < FIX_WAIT_SECONDS) && !(gotLatLong && gotElevation && gotSpeed && gotTime); x++)
+    for (uint32_t x = 0; (x < GNSS_WAIT_SECONDS) && !gotTime; x++)
     {
         while (((returnCode = pGnss->getMessage(buffer, sizeof(buffer))) > 0) &&
                 !(gotLatLong && gotElevation && gotSpeed && gotTime))
         {
             int32_t length = LENGTH(returnCode);
 
-            if ((PROTOCOL(returnCode) == GNSSParser::NMEA) && (length > 6))
+            if ((PROTOCOL(returnCode) == GnssParser::NMEA) && (length > 6))
             {
                 printf(".");
 
@@ -148,7 +148,7 @@ void test_serial_fix() {
                             gotLatLong = true;
                             latitude *= 60000;
                             longitude *= 60000;
-                            printf("\r\nGNSS: location %.5f %.5f %c.\r\n", latitude, longitude, ch);
+                            printf("\nGNSS: location %.5f %.5f %c.\n", latitude, longitude, ch);
                         }
                     }
                     else if (_CHECK_TALKER("GGA") || _CHECK_TALKER("GNS"))
@@ -160,13 +160,13 @@ void test_serial_fix() {
                         if (pTimeString != NULL)
                         {
                             gotTime = true;
-                            printf("\r\nGNSS: time is %.6s.", pTimeString);
+                            printf("\nGNSS: time is %.6s.", pTimeString);
                         }
 
                         if (pGnss->getNmeaItem(9, buffer, length, elevation)) // altitude msl [m]
                         {
                             gotElevation = true;
-                            printf("\r\nGNSS: elevation: %.1f.", elevation);
+                            printf("\nGNSS: elevation: %.1f.", elevation);
                         }
                     }
                     else if (_CHECK_TALKER("VTG"))
@@ -174,7 +174,7 @@ void test_serial_fix() {
                         if (pGnss->getNmeaItem(7, buffer, length, speed)) // speed [km/h]
                         {
                             gotSpeed = true;
-                            printf("\r\nGNSS: speed: %.1f.", speed);
+                            printf("\nGNSS: speed: %.1f.", speed);
                         }
                     }
                 }
@@ -184,10 +184,10 @@ void test_serial_fix() {
         wait_ms(1000);
     }
 
-    printf("\r\n");
+    printf("\n");
 
-    // May not be able to get a GNSS fix but we should at least be able to receive
-    // the time from a satellite
+    // Depending on antenna positioning we may not be able to get a GNSS fix but we
+    // should at least be able to receive the time from a satellite
     TEST_ASSERT(gotTime);
 }
 
@@ -204,8 +204,8 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 
 // Test cases
 Case cases[] = {
-    Case("Serial ubx", test_serial_ubx),
-    Case("Fix over serial", test_serial_fix),
+    Case("Ubx command", test_serial_ubx),
+    Case("Get time", test_serial_time),
 };
 
 Specification specification(test_setup, cases);

@@ -34,10 +34,15 @@
 
 /** basic GNSS parser class
 */
-class GNSSParser
+class GnssParser
 {
 public:
-    /** Power on / Wake up the gnss
+    //! Constructor
+    GnssParser();
+    //! Destructor
+    virtual ~GnssParser(void);
+
+    /** Power on / Wake up the GNSS
     */
     virtual bool init(PinName pn) = 0;
     
@@ -90,7 +95,7 @@ public:
     virtual int sendUbx(unsigned char cls, unsigned char id, 
                         const void* buf = NULL, int len = 0);
     
-    /** Power off the gnss, it can be again woken up by an
+    /** Power off the GNSS, it can be again woken up by an
         edge on the serial port on the external interrupt pin. 
     */
     void powerOff(void);
@@ -141,6 +146,10 @@ public:
     static bool getNmeaAngle(int ix, char* buf, int len, double& val);
     
 protected:
+    /** Power on the GNSS module.
+    */
+    void _powerOn(void);
+
     /** Get a line from the physical interface. 
         \param pipe the receiveing pipe to parse messages 
         \param buf the buffer to store it
@@ -177,33 +186,32 @@ protected:
     */
     virtual int _send(const void* buf, int len) = 0;
     
-    static const char toHex[16]; //!< num to hex conversion
-#ifdef TARGET_UBLOX_C030
-    bool _onboard;
-#endif
+    static const char _toHex[16]; //!< num to hex conversion
+    DigitalInOut *_gnssEnable; //!< IO pin that enables GNSS
+    DigitalInOut *_gnssPower; //!< IO pin that enables power to GNSS
 };
 
-/** gnss class which uses a serial port
+/** GNSS class which uses a serial port
     as physical interface. 
 */
-class GNSSSerial : public SerialPipe, public GNSSParser
+class GnssSerial : public SerialPipe, public GnssParser
 {
 public:
     /** Constructor
-        \param tx is the serial ports transmit pin (gnss to CPU)
-        \param rx is the serial ports receive pin (CPU to gnss)
-        \param baudrate the baudrate of the gnss use 9600
+        \param tx is the serial ports transmit pin (GNSS to CPU)
+        \param rx is the serial ports receive pin (CPU to GNSS)
+        \param baudrate the baudrate of the GNSS use 9600
         \param rxSize the size of the serial rx buffer
         \param txSize the size of the serial tx buffer
     */
-    GNSSSerial(PinName tx    GNSS_IF( = GNSSTXD, /* = D8 */), // resistor on shield not populated
+    GnssSerial(PinName tx    GNSS_IF( = GNSSTXD, /* = D8 */), // resistor on shield not populated
                PinName rx    GNSS_IF( = GNSSRXD, /* = D9 */), // resistor on shield not populated
                int baudrate  GNSS_IF( = GNSSBAUD, = 9600 ),
                int rxSize    = 256 ,
                int txSize    = 128 );
               
     //! Destructor
-    virtual ~GNSSSerial(void);
+    virtual ~GnssSerial(void);
     
     virtual bool init(PinName pn = NC);
     
@@ -225,9 +233,9 @@ protected:
     virtual int _send(const void* buf, int len);
 };
 
-/** gnss class which uses a i2c as physical interface.
+/** GNSS class which uses a i2c as physical interface.
 */
-class GNSSI2C : public I2C, public GNSSParser
+class GnssI2C : public I2C, public GnssParser
 {
 public: 
     /** Constructor
@@ -236,12 +244,12 @@ public:
         \param adr the I2C address of the GNSS set to (66<<1)
         \param rxSize the size of the serial rx buffer
     */
-    GNSSI2C(PinName sda          GNSS_IF( = NC, = D16 ),
+    GnssI2C(PinName sda         GNSS_IF( = NC, = D16 ),
            PinName scl          GNSS_IF( = NC, = D17 ),
            unsigned char i2cAdr GNSS_IF( = (66<<1), = (66<<1) ),
            int rxSize           = 256 );
     //! Destructor
-    virtual ~GNSSI2C(void);
+    virtual ~GnssI2C(void);
     
     /** helper function to probe the i2c device
         \return true if successfully detected the GNSS chip.

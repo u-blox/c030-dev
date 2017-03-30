@@ -8,8 +8,6 @@ To fetch and build the code in this repository you must first install the [mbed 
 
 Then, to run the tests, you must install the [mbed test tools](https://github.com/ARMmbed/greentea/blob/master/docs/QUICKSTART.md).
 
-Until we have C030 boards, you will also need to obtain a Vodafone UTM board, along with its LiPo battery and a USB cable to connect it to a PC; we're using this for driver development as it includes the LiPo battery gauge, LiPo battery charger and external battery gauge chips that we will use on the C030 board.
-
 # How To Test This Code
 
 Clone this repo.
@@ -38,7 +36,7 @@ Now you are ready to run the tests.  Connect your board to your PC and check tha
 
 `mbedls`
 
-You should get back something like (this is for a C030 board):
+You should get back something like:
 
 ```
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
@@ -48,7 +46,7 @@ You should get back something like (this is for a C030 board):
 +---------------+----------------------+-------------+-------------+--------------------------+-----------------+
 ```
 
-If you get back the platform NZ32_SC151 (target_id commencing 6660) then you will need to get mbed to pretend it is a C030 board.  You can do this with the following command:
+If you get back the platform NZ32_SC151 (target_id commencing 6660), or some other target while we are still not quite setup with the correct board IDs, then you will need to get mbed to pretend it is a C030 board.  You can do this with a command of the following form:
 
 `mbedls --mock 6660:UBLOX_C030`
 

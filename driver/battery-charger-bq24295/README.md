@@ -1,3 +1,3 @@
 This class provides APIs to all of the registers of the TI BQ24295 battery charger chip.
 
-The caller should instantiate an I2C interface and pass this to init(), which will initialise the chip and place it into its lowest power state.  The chip may then be configured using the API calls.  Once the chip is configured, battery charging can be enabled.  If battery charging is disabled the chip will once more be put into its lowest power state.
+The caller should instantiate an I2C interface and pass this to `init()`, which will initialise the chip and place it into its lowest power state.  The chip may then be configured using the API calls.  Once the chip is configured, battery charging can be enabled.  If battery charging is disabled the chip will once more be put into its lowest power state.

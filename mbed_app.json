@@ -1,0 +1,9 @@
+{
+    "macros": ["USE_DEBUG_8MHz_XTAL"],
+    "target_overrides": {
+        "*": {
+            "target.macros_remove": ["HSE_VALUE=12000000"],
+            "target.macros_add": ["HSE_VALUE=8000000"]
+        }
+    }
+}

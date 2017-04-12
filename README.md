@@ -24,11 +24,11 @@ Change to the `mbed-os` directory and run:
 
 ...to switch to the `c030-dev` branch that we are working on in our u-blox mbed-os Github repository.
 
-Set the target and the toolchain that you want to use, which should be `UBLOX_C030` and one of `GCC_ARM`, `ARM` or `IAR`.
+Set the target and the toolchain that you want to use, which should be `UBLOX_C030_U201` and one of `GCC_ARM`, `ARM` or `IAR`.
 
 You can set the target and toolchain for this application once by entering the following two commands (while in the top-level directory of the cloned repo):
 
-`mbed target UBLOX_C030`
+`mbed target UBLOX_C030_U201`
 
 `mbed toolchain GCC_ARM`
 
@@ -39,16 +39,16 @@ Now you are ready to run the tests.  Connect your board to your PC and check tha
 You should get back something like:
 
 ```
-+---------------+----------------------+-------------+-------------+--------------------------+-----------------+
-| platform_name | platform_name_unique | mount_point | serial_port | target_id                | daplink_version |
-+---------------+----------------------+-------------+-------------+--------------------------+-----------------+
-| UBLOX_C030    | UBLOX_C030[0]        | D:          | COM1        | 12340201E3953CC69934E380 | 0201            |
-+---------------+----------------------+-------------+-------------+--------------------------+-----------------+
++------------------+----------------------+-------------+-------------+--------------------------+-----------------+
+| platform_name    | platform_name_unique | mount_point | serial_port | target_id                | daplink_version |
++------------------+----------------------+-------------+-------------+--------------------------+-----------------+
+| UBLOX_C030_U201  | UBLOX_C030_U201[0]   | D:          | COM1        | 12340201E3953CC69934E380 | 0201            |
++------------------+----------------------+-------------+-------------+--------------------------+-----------------+
 ```
 
 If you get back the platform NZ32_SC151 (target_id commencing 6660), or some other target while we are still not quite setup with the correct board IDs, then you will need to get mbed to pretend it is a C030 board.  You can do this with a command of the following form:
 
-`mbedls --mock 6660:UBLOX_C030`
+`mbedls --mock 6660:UBLOX_C030_U201`
 
 Now you can build and run the tests for all of mbed with the following command line:
 
@@ -61,7 +61,7 @@ Or if you want to test just the drivers in the directory, use the following comm
 You should see output something like:
 
 ```
-Building library mbed-build (UBLOX_C030, GCC_ARM)
+Building library mbed-build (UBLOX_C030_U201, GCC_ARM)
 Scan: c030
 Scan: FEATURE_BLE
 Scan: FEATURE_COMMON_PAL
@@ -79,7 +79,7 @@ Scan: FEATURE_THREAD_ROUTER
 Scan: FEATURE_STORAGE
 Scan: GCC_ARM
 Scan: FEATURE_LWIP
-Building project default (UBLOX_C030, GCC_ARM)
+Building project default (UBLOX_C030_U201, GCC_ARM)
 Scan: GCC_ARM
 Scan: FEATURE_LWIP
 Scan: default
@@ -98,28 +98,28 @@ Allocated Stack: unknown
 Total Static RAM memory (data + bss): 10272 bytes
 Total RAM memory (data + bss + heap + stack): 10272 bytes
 Total Flash memory (text + data + misc): 37025 bytes
-Image: BUILD/tests/UBLOX_C030/GCC_ARM/driver/battery-gauge-bq27441/TESTS/unit_tests/default/default.bin
+Image: BUILD/tests/UBLOX_C030_U201/GCC_ARM/driver/battery-gauge-bq27441/TESTS/unit_tests/default/default.bin
 
 
 Memory map breakdown for built projects (values in Bytes):
-+---------+------------+-----------+------------+-------+------+-----------+-------------+
-| name    | target     | toolchain | static_ram | stack | heap | total_ram | total_flash |
-+---------+------------+-----------+------------+-------+------+-----------+-------------+
-| default | UBLOX_C030 | GCC_ARM   |      10272 |     0 |    0 |     10272 |       37025 |
-+---------+------------+-----------+------------+-------+------+-----------+-------------+
++---------+-----------------+-----------+------------+-------+------+-----------+-------------+
+| name    | target          | toolchain | static_ram | stack | heap | total_ram | total_flash |
++---------+-----------------+-----------+------------+-------+------+-----------+-------------+
+| default | UBLOX_C030_U201 | GCC_ARM   |      10272 |     0 |    0 |     10272 |       37025 |
++---------+-----------------+-----------+------------+-------+------+-----------+-------------+
 
 Build successes:
-  * UBLOX_C030::GCC_ARM::DRIVER-BATTERY-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
-  * UBLOX_C030::GCC_ARM::MBED-BUILD
+  * UBLOX_C030_U201::GCC_ARM::DRIVER-BATTERY-GAUGE-BQ27441-TESTS-UNIT_TESTS-DEFAULT
+  * UBLOX_C030_U201::GCC_ARM::MBED-BUILD
 mbedgt: greentea test automation tool ver. 1.2.2
-mbedgt: test specification file 'C:\projects\c030\BUILD\tests\UBLOX_C020\GCC_ARM\test_spec.json' (specified with --test-spec option)
-mbedgt: using 'C:\projects\c030\BUILD\tests\UBLOX_C030\GCC_ARM\test_spec.json' from current directory!
+mbedgt: test specification file 'C:\projects\c030-dev\BUILD\tests\UBLOX_C030_U201\GCC_ARM\test_spec.json' (specified with --test-spec option)
+mbedgt: using 'C:\projects\c030-dev\BUILD\tests\UBLOX_C030_U201\GCC_ARM\test_spec.json' from current directory!
 mbedgt: detecting connected mbed-enabled devices...
 mbedgt: detected 1 device
-mbedgt: processing target 'UBLOX_C030' toolchain 'GCC_ARM' compatible platforms... (note: switch set to --parallel 1)
+mbedgt: processing target 'UBLOX_C030_U201' toolchain 'GCC_ARM' compatible platforms... (note: switch set to --parallel 1)
 mbedgt: test case filter (specified with -n option)
         test filtered in 'driver-battery-gauge-bq27441-tests-unit_tests-default'
-mbedgt: running 1 test for platform 'UBLOX_C030' and toolchain 'GCC_ARM'
+mbedgt: running 1 test for platform 'UBLOX_C030_U201' and toolchain 'GCC_ARM'
 mbedgt: mbed-host-test-runner: started
 mbedgt: checking for GCOV data...
 mbedgt: test on hardware with target id: 12340201E3953CC69934E380
@@ -129,18 +129,18 @@ mbedgt: test case summary: 1 pass, 0 failures
 mbedgt: all tests finished!
 mbedgt: shuffle seed: 0.7592919699
 mbedgt: test suite report:
-+--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
-| target             | platform_name | test suite                                            | result | elapsed_time (sec) | copy_method |
-+--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
-| UBLOX_C030-GCC_ARM | UBLOX_C030    | driver-battery-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
-+--------------------+---------------+-------------------------------------------------------+--------+--------------------+-------------+
++-------------------------+-----------------+-------------------------------------------------------+--------+--------------------+-------------+
+| target                  | platform_name   | test suite                                            | result | elapsed_time (sec) | copy_method |
++-------------------------+-----------------+-------------------------------------------------------+--------+--------------------+-------------+
+| UBLOX_C030_U201-GCC_ARM | UBLOX_C030_U201 | driver-battery-gauge-bq27441-tests-unit_tests-default | OK     | 10.46              | shell       |
++-------------------------+-----------------+-------------------------------------------------------+--------+--------------------+-------------+
 mbedgt: test suite results: 1 OK
 mbedgt: test case report:
-+---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-| target              | platform_name | test suite                                            | test case              | passed | failed | result | elapsed_time (sec) |
-+---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
-|  UBLOX_C030-GCC_ARM | UBLOX_C030    | driver-battery-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
-+---------------------+---------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
++--------------------------+-----------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+| target                   | platform_name   | test suite                                            | test case              | passed | failed | result | elapsed_time (sec) |
++--------------------------+-----------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
+|  UBLOX_C030_U201-GCC_ARM | UBLOX_C030_U201 | driver-battery-gauge-bq27441-tests-unit_tests-default | Testing initialisation | 1      | 0      | OK     | 0.05               |
++--------------------------+-----------------+-------------------------------------------------------+------------------------+--------+--------+--------+--------------------+
 ```
 
 # Low Power Modes
@@ -157,7 +157,7 @@ As well as the tests for the code in here, there is a `main.cpp` file which is u
 
 `mbed compile`
 
-You will find the output files in the sub-directory `BUILD/UBLOX_C030/GCC_ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the C030 board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the C030 board.  Press the reset button on the board and you should see serial output. It doesn't do a great deal, that's what the tests are for.
+You will find the output files in the sub-directory `BUILD/UBLOX_C030_U201/GCC_ARM/`.  Drag and drop the `.bin` file onto the mbed mapped drive presented by the C030 board and wait for it to program.  Then connect a serial terminal (e.g. PuTTY or TeraTerm) to the mbed COM port (@ 9600/8/N/1) presented by the C030 board.  Press the reset button on the board and you should see serial output. It doesn't do a great deal, that's what the tests are for.
 
 # Debugging
 

@@ -1,3 +1,6 @@
+# THIS REPO IS NO LONGER IN USE
+All libraries for the C030 platform are now available from https://developer.mbed.org/teams/ublox/code/.
+
 # C030 Development Area
 
 This repo contains the early development code and associated tests for the C030 board.  This code will later be split into individual libraries.
